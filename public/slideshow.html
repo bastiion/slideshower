@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Slideshow</title>
+  <style>
+    #imgSlide {
+        max-width: 100%;
+        max-height: 100vh;
+        display: block;
+    }
+  </style>
+</head>
+<body>
+<div class="slideshow">
+  <img id="imgSlide" src="" alt="">
+</div>
+<script src="/jquery/dist/jquery.min.js"></script>
+<script src="/public/client.js"></script>
+<script>
+  window.setInterval(() => {
+    if(images.length <= 0) return;
+    imageIndex++;
+    if(images.length <= imageIndex)
+      imageIndex = 0;
+    $("#imgSlide").attr('src', uploadPath + images[imageIndex]);
+  }, 5000)
+</script>
+
+</body>
+</html>

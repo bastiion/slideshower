@@ -3,14 +3,63 @@ const bodyParser = require("body-parser");
 const multer = require('multer');
 const fs = require("fs");
 const spawn = require('child_process').spawn;
+const WebSocket = require("ws");
 
 let mpvChild;
 
 
 const app = express();
 
+
 app.use(express.static("node_modules"));
+app.use('/uploads', express.static("uploads"));
+app.use('/public', express.static("public"));
 app.use(bodyParser.json());
+
+const server = app.listen(3000, function () {
+  console.log("Working on port 3000");
+
+});
+const wss = new WebSocket.Server({server: server});
+
+const wsAll = [];
+
+function sendListImages(wsArr) {
+  fs.readdir(process.cwd() + '/uploads/', (err, listing) => {
+    for(let ws of wsArr) {
+      ws.send(JSON.stringify(
+          { command: "listImages", data: listing}));
+    }
+  });
+}
+
+wss.on('connection', function connection(ws) {
+
+  wsAll.push(ws);
+
+  ws.on('close', function incoming(message) {
+    wsAll.splice(wsAll.indexOf(ws), 1);
+  });
+  ws.on('message', function incoming(message) {
+
+    try {
+      const msg = JSON.parse(message)
+      switch (msg.command) {
+        case "listImages":
+          sendListImages([ws]);
+          break;
+        default:
+          ws.send(JSON.stringify({
+            answer: 42
+          }));
+
+      }
+
+    } catch (e) {
+
+    }
+  });
+});
 
 const storage = multer.diskStorage({
   destination: function (req, file, callback) {
@@ -44,6 +93,7 @@ app.post('/api/photo', function (req, res) {
     if (err) {
       return res.end("Error uploading file.");
     }
+    sendListImages(wsAll);
     res.end("File is uploaded");
   });
 });
@@ -57,7 +107,8 @@ app.get('/api/play', function (req, res) {
 
     }
   }
-  mpvChild = spawn('/usr/bin/mplayer', [/*"--image-display-duration=12",*/ process.cwd() + "/uploads/*.jpg"])
+  mpvChild = spawn('/usr/bin/mplayer', [-/*"--image-display-duration=12",*/ process.cwd() + "/uploads/*.jpg"])
+
   mpvChild.stdout.on('data', (data) => {
     console.log(`stdout: ${data}`);
   });
@@ -73,7 +124,3 @@ app.get('/api/play', function (req, res) {
 });
 
 
-app.listen(3000, function () {
-  console.log("Working on port 3000");
-
-});
