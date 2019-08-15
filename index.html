@@ -1,24 +1,77 @@
 <html>
 <head>
   <title>File upload Node.</title>
+  <link rel="stylesheet" href="semantic-ui/dist/components/reset.css">
+  <link rel="stylesheet" href="semantic-ui/dist/semantic.css">
+  <style>
+    .preview {
+      width: 50px;
+    }
+  </style>
 </head>
 <body>
-<form id="uploadForm"
-      enctype="multipart/form-data"
-      action="/api/photo"
-      method="post">
-  <input type="file" name="userFile" multiple />
-  <input type="submit" value="Upload Image" name="submit">
-  <input type='text' id='random' name='random'><br>
-  Wie lange in MS?
-  <input type='text' id='duration' name='duration'><br>
-  <span id = "status"></span>
-</form>
+<div class="ui text container upload-form">
+  <h1 class="ui dividing header">1. Ein Bild oder Video hochladen</h1>
+  <form class="ui form" id="uploadForm"
+        enctype="multipart/form-data"
+        action="/api/photo"
+        method="post">
+    <div class="field">
+      <label>Bild oder Video</label>
+      <input type="file" name="userFile" multiple />
+    </div>
+    <div class="field">
+      <label>Dauer der Darstellung in Sekunden</label>
+      <input type='number' id='duration' name='duration'><br>
+    </div>
+    <div class="field">
+      <div class="ui checkbox">
+        <input type="checkbox" tabindex="0" class="hidden">
+        <label>Ich akzeptiere die <a href="conditions.html">Bedingungen</a></label>
+      </div>
+    </div>
+    <button class="ui button" type="submit">Medien zum Kunstwerk übermitteln</button>
+    <span id = "status"></span>
+  </form>
+</div>
+<div class="ui text container sortable-content">
+  <h1 class="ui dividing header">Playlist erstellen</h1>
+  <ul id="wrap" class="ui list">
+  </ul>
+</div>
 <script src="jquery/dist/jquery.min.js"></script>
-<script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.form/3.51/jquery.form.min.js"></script>
+<script src="jquery-form/dist/jquery.form.min.js"></script>
+<script src="sortablejs/Sortable.js"></script>
+<script src="jquery-sortablejs/jquery-sortable.js"></script>
+<script src="semantic-ui/dist/semantic.js"></script>
 <script src="public/client.js"></script>
 <script>
   $(document).ready(function() {
+    $(document).on("images-updated", (event) => {
+      const imgagesArr = event.detail.images;
+      if(!Array.isArray(imgagesArr)) return;
+      $("#wrap").empty();
+      for(let mediaFile of imgagesArr) {
+        const mediaPath = uploadPath + mediaFile;
+        $("#wrap").append(`
+<li>
+<div class="ui divided items">
+  <div class="item">
+    <div class="ui tiny image">
+      <img src='${mediaPath}'>
+    </div>
+    <div class="middle aligned content">
+      ${mediaFile} <br>
+      Dauer in Sekunden<input type="number" name="duration" class="duration-change" value="20">
+    </div>
+  </div>
+</li>
+`
+        )
+      }
+      $("#wrap").sortable();
+    });
+
     $('#uploadForm').submit(function() {
       $("#status").empty().text("File is uploading...");
       $(this).ajaxSubmit({
@@ -26,7 +79,7 @@
           status('Error: ' + xhr.status);
         },
         success: function(response) {
-          console.log(response)
+          console.log(response);
           $("#status").empty().text(response);
         }
       });

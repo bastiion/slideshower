@@ -19,6 +19,9 @@ ws.addEventListener("message", (msg) => {
       case "listImages":
         if(Array.isArray(message.data)) {
           images = message.data;
+          document.dispatchEvent(
+              new CustomEvent("images-updated", {detail: {images: images}})
+          )
         }
         break;
       default:

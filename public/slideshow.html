@@ -7,16 +7,31 @@
     body {
       background-color: black;
     }
-    #imgSlide {
+
+    .slideshow > video.media-element {
+      display: none;
+    }
+    .slideshow > img.media-element {
+      display: block;
+    }
+    .slideshow[data-video-is-active] > img.media-element {
+      display: none;
+    }
+    .slideshow[data-video-is-active] > video.media-element {
+      display: block;
+    }
+
+
+    .media-element {
         max-width: 100%;
         max-height: 100vh;
-        display: block;
     }
   </style>
 </head>
 <body>
-<div class="slideshow">
-  <img id="imgSlide" src="" alt="">
+<div data-video-is-active class="slideshow">
+  <img class="media-element" id="imgSlide" src="" alt="">
+  <video class="media-element" id="videoSlide" src="" alt="">
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
 <script src="/public/client.js"></script>
