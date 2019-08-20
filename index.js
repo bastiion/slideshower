@@ -20,7 +20,7 @@ app.use(UPLOAD_RELATIVE_URI, express.static(UPLOAD_DIR));
 app.use('/public', express.static("public"));
 app.use(bodyParser.json());
 
-const server = app.listen(3000, function () {
+const server = app.listen(3000, () => {
   console.log("Working on port 3000");
 });
 
@@ -30,7 +30,7 @@ const server = app.listen(3000, function () {
 mongoose.connect(MONGO_DB, {useNewUrlParser: true});
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function() {
+db.once('open', () => {
   console.log("we are connected")
 });
 
@@ -42,7 +42,7 @@ const MediaElementSchema = new mongoose.Schema({
 const MediaElement = mongoose.model('MediaElement', MediaElementSchema);
 
 /**
- * send a listing of all files in the UPLOAD_DIR to all
+ * send a listing of all files in the UPLOAD_DIR to all}
  * websocket clients in wsArr
  * @param wsArr: Array[WebSocket]
  */
@@ -96,10 +96,10 @@ wss.on('connection', ws => {
 // we ease our live using the multer library, that does everything complicated for us
 
 const storage = multer.diskStorage({
-  destination: function (req, file, callback) {
+  destination: (req, file, callback) => {
     callback(null, UPLOAD_DIR);
   },
-  filename: function (req, file, callback) {
+  filename: (req, file, callback) => {
     let duration = parseInt(req.body.duration);
     if (!duration) {
       duration = 10
@@ -124,13 +124,13 @@ const storage = multer.diskStorage({
 const upload = multer({storage: storage}).array('userFile', 10);
 
 //serve the index page
-app.get('/', function (req, res) {
+app.get('/', (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
 //the upload form post request
-app.post('/api/photo', function (req, res) {
-  upload(req, res, function (err) {
+app.post('/api/photo', (req, res) => {
+  upload(req, res, err => {
     //req.body
     //req.files
     if (err) {
@@ -146,7 +146,7 @@ app.post('/api/photo', function (req, res) {
 // as a reference how to start sub processes directly out of node js
 let mpvChild;
 
-app.get('/api/play', function (req, res) {
+app.get('/api/play', (req, res) => {
   //fs.readFile("")
   if (mpvChild) {
     try {
