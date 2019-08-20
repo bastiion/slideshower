@@ -37,6 +37,7 @@
   <video class="media-element" autoplay muted id="videoSlide" src="" alt=""></video>
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
+<script src="/vanilla-fade/dist/vanilla-fade.js"></script>
 <script src="/public/client.js"></script>
 <script>
   let playlist = [];
@@ -99,14 +100,19 @@
     const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
     if (!isImage && !isVideo) return;
 
-    if (isVideo) {
-      slideshowElement.attr('data-video-is-active', true);
-      videoSlideElement.attr('src', mediaPath);
-    } else {
-      slideshowElement.attr('data-video-is-active', null);
-      imgSlideELement.attr('src', mediaPath);
-      timer = window.setTimeout(nextSlide, mediaFile.duration * 1000);
-    }
+    slideshowElement[0].fadeOut(duration = 250, easing = 'linear', complete = () => {
+      if (isVideo) {
+        slideshowElement.attr('data-video-is-active', true);
+        videoSlideElement.attr('src', mediaPath);
+      } else {
+        slideshowElement.attr('data-video-is-active', null);
+        imgSlideELement.attr('src', mediaPath);
+        timer = window.setTimeout(nextSlide, mediaFile.duration * 1000 + 200);
+      }
+      setTimeout(() => {
+        slideshowElement[0].fadeIn(duration = 250, easing = 'linear', complete = null)
+      }, 200);
+    });
 
   }
 

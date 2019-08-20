@@ -20,6 +20,9 @@ const app = express();
 app.use(express.static("node_modules"));
 app.use(UPLOAD_RELATIVE_URI, express.static(UPLOAD_DIR));
 app.use('/public', express.static("public"));
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
 app.use(bodyParser.json());
 app.set('json spaces', 4);
 
@@ -40,8 +43,9 @@ db.once('open', () => {
 const MediaElementSchema = new mongoose.Schema({
   fileName: String,
   duration: Number,
+  orderIndex: {type: Number, default: () => parseInt(Math.random() * 10000)},
   mimeType: String,
-  uploadDate: { type: Date, default: Date.now }
+  uploadDate: {type: Date, default: Date.now}
 });
 const MediaElement = mongoose.model('MediaElement', MediaElementSchema);
 
@@ -52,26 +56,26 @@ const MediaElement = mongoose.model('MediaElement', MediaElementSchema);
  */
 function sendListFiles(wsArr) {
   fs.readdir(UPLOAD_DIR, (err, listing) => {
-    for(let ws of wsArr) {
+    for (let ws of wsArr) {
       ws.send(JSON.stringify(
-          { command: "listImages", data: listing}));
+          {command: "listImages", data: listing}));
     }
   });
 }
 
 function sendPlaylist(wsArr) {
-  MediaElement.find().exec().then(playlist => {
-    for(let ws of wsArr) {
+  MediaElement.find().sort({'orderIndex': 'asc'}).exec().then(playlist => {
+    for (let ws of wsArr) {
       ws.send(JSON.stringify(
-          { command: "playlist", data: playlist}));
+          {command: "playlist", data: playlist}));
     }
   });
 }
 
 function sendNewElements(elements, wsArr) {
-  for(let ws of wsArr) {
+  for (let ws of wsArr) {
     ws.send(JSON.stringify(
-        { command: "newElements", data: elements}));
+        {command: "newElements", data: elements}));
   }
 }
 
@@ -86,7 +90,7 @@ wss.on('connection', ws => {
 
   wsAll.push(ws);
 
-  ws.on('close',message => {
+  ws.on('close', message => {
     wsAll.splice(wsAll.indexOf(ws), 1);
   });
 
@@ -148,14 +152,14 @@ app.get('/', (req, res) => {
 app.post('/api/photo', upload, (req, res) => {
   console.log(req.files);
   res.end("File has been uploaded");
-  if(!Array.isArray(req.files)) return;
+  if (!Array.isArray(req.files)) return;
   let duration = parseInt(req.body.duration);
   if (!duration) {
     duration = DEFAULT_DURATION
   }
   const newMediaElements = req.files.map(file => {
     const mimeType = mime.lookup(file.path);
-    return { fileName: file.filename, mimeType: mimeType, duration: duration}
+    return {fileName: file.filename, mimeType: mimeType, duration: duration}
   });
   MediaElement.create(newMediaElements).then((newElements) => {
     sendPlaylist(wsAll);
@@ -165,14 +169,30 @@ app.post('/api/photo', upload, (req, res) => {
 
 app.delete('/api/playlist', (req, res) => {
   MediaElement.deleteMany({}, (err) => {
-    if(err) throw new Error("Cannot delete playlist", err);
+    if (err) throw new Error("Cannot delete playlist", err);
+    sendPlaylist(wsAll);
     res.sendStatus(204);
   }).exec();
 });
 
 app.delete('/api/playlist/:id', (req, res) => {
   MediaElement.findByIdAndDelete(req.params.id, (err) => {
-    if(err) throw new Error("Cannot delete file out of playlist", err);
+    if (err) throw new Error("Cannot delete file out of playlist", err);
+    sendPlaylist(wsAll);
+    res.sendStatus(204);
+  }).exec();
+});
+
+app.post('/api/playlist/:id', (req, res) => {
+  const duration = parseInt(req.body.duration);
+  if (isNaN(duration)) {
+    throw new Error("duration is not a number");
+  }
+
+  MediaElement.findById(req.params.id, (err, mediaFile) => {
+    if (err) throw new Error("Cannot find file  inplaylist", err);
+    mediaFile.duration = duration;
+    mediaFile.save();
     res.sendStatus(204);
   }).exec();
 });
@@ -181,21 +201,41 @@ app.delete('/api/playlist/:id', (req, res) => {
 app.delete('/api/files/:fileName', (req, res, next) => {
   let fileName = req.params.fileName;
   MediaElement.deleteOne({fileName: fileName}, (err) => {
-    if(err) throw new Error("Cannot delete file out of playlist", err);
+    if (err) throw new Error("Cannot delete file out of playlist", err);
   }).exec();
   fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
-    if(err) throw new Error("Cannot remove file from disk", err);
+    if (err) throw new Error("Cannot remove file from disk", err);
     res.sendStatus(204);
   });
 });
 
+app.post('/api/playlist', (req, res) => {
+  Promise.all(req.body.playlist.map(item => {
+    let resolve, reject;
+    let promise = new Promise((_resolve, _reject) => {
+      resolve = _resolve;
+      reject = _reject;
+    });
+    MediaElement.findById(item._id, (err, mediaFile) => {
+      const orderIndex = parseInt(item.oderIndex);
+      if (!isNaN(orderIndex)) return;
+      mediaFile.orderIndex = item.orderIndex;
+      mediaFile.save().then(resolve, reject)
+    });
+    return promise;
+  })).then(() => {
+    sendPlaylist(wsAll);
+    res.sendStatus(204);
+  })
+});
+
 app.put('/api/playlist/recreate', (req, res) => {
   fs.readdir(UPLOAD_DIR, (err, listing) => {
-    if(err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
-    for(let fileName of listing) {
+    if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
+    for (let fileName of listing) {
       const filePath = `${UPLOAD_DIR}/${fileName}`;
       const mimeType = mime.lookup(filePath);
-      const mediaElement = new MediaElement({ fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
+      const mediaElement = new MediaElement({fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
       mediaElement.save();
     }
     res.sendStatus(204);
@@ -216,7 +256,7 @@ app.put('/api/playlist/recreate', (req, res) => {
 });*/
 
 app.get('/api/playlist', (req, res) => {
-  MediaElement.find().exec().then(playlist => res.json(playlist))
+  MediaElement.find().sort({'orderIndex': 'asc'}).exec().then(playlist => res.json(playlist))
 });
 
 // this was a planed in order to launch a media player. can be omited or used

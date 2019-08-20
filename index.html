@@ -71,7 +71,7 @@
 
     function showDeleteMediaElementConfirmModal(event) {
       const dialog = $("#confirmDeleteModal");
-      currentMediaElementItemJQ = $(event.target).closest('.media-element-item')
+      currentMediaElementItemJQ = $(event.target).closest('.media-element-item');
       $(".modal-title", dialog).text(`${currentMediaElementItemJQ.attr('data-media-element-file-name')} entfernen?`);
       dialog.modal('show');
     }
@@ -96,13 +96,13 @@
         const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
 
         wrapElement.append(`
-  <div class="ui item media-element-item" data-media-element-id="${mediaFile.id}" data-media-element-file-name="${mediaFile.fileName}">
+  <div class="ui item media-element-item" data-media-element-id="${mediaFile._id}" data-media-element-file-name="${mediaFile.fileName}">
     <div class="ui tiny images">
     ${mediaElement}
     </div>
     <div class="middle aligned content">
       ${mediaFile.fileName} <br>
-      Dauer in Sekunden<input type="number" name="duration" class="duration-change" value="${mediaFile.duration}">
+      Dauer in Sekunden<input type="number" name="duration" class="duration-change-input" value="${mediaFile.duration}">
       <div class="ui vertical animated button delete-media-btn" tabindex="0">
         <div class="hidden content">delete</div>
         <div class="visible content">
@@ -115,7 +115,27 @@
         )
       }
       $(".delete-media-btn", wrapElement).on('click', showDeleteMediaElementConfirmModal);
-      wrapElement.sortable();
+      wrapElement.sortable({
+        onUpdate: event => {
+          const  playlistChangedOrder = [];
+          $(event.to).children('.media-element-item').each((i, item) => {
+            playlistChangedOrder.push( {
+              _id: $(item).attr('data-media-element-id'),
+              orderIndex: i
+            });
+          });
+          updatePlaylistOrder(playlistChangedOrder);
+        }
+      });
+      $(".duration-change-input").on('focusout', (event) => {
+        let _currentMediaElementItemJQ = $(event.target).closest('.media-element-item');
+        let duration = parseInt($(event.target).val());
+        if(!isNaN(duration) && duration > 0 ) {
+          updateFile(_currentMediaElementItemJQ.attr('data-media-element-id'), {
+            duration: duration
+          });
+        }
+      });
     });
 
     $('#uploadForm').submit(function () {
