@@ -1,28 +1,43 @@
-const wsAddr = 'ws://'+location.hostname+(location.port ? ':'+location.port: '');
+const wsAddr = 'ws://' + location.hostname + (location.port ? ':' + location.port : '');
+const baseAddr = 'http://' + location.hostname + (location.port ? ':' + location.port : '');
 const ws = new WebSocket(wsAddr);
 const uploadPath = "/uploads/";
-let images = [];
-let imageIndex = 0;
 
+
+function deleteFile(fileName) {
+  return fetch(baseAddr + "/api/files/" + fileName, {method: 'DELETE'});
+}
 
 function sendJSON(data) {
-  ws.send(JSON.stringify(data)) ;
+  ws.send(JSON.stringify(data));
 }
+
 function sendCommand(cmd, data) {
   sendJSON({command: cmd, data: data})
 }
-ws.addEventListener("message", (msg) => {
-  console.log(msg.data);
+
+ws.addEventListener("message", message => {
   try {
-    const message = JSON.parse(msg.data)
-    switch (message.command) {
+    const msg = JSON.parse(message.data)
+    switch (msg.command) {
+      case "playlist":
+        if (!Array.isArray(msg.data)) return;
+        document.dispatchEvent(
+            new CustomEvent("playlist-updated", {detail: {playlist: msg.data}})
+        );
+        break;
+      case "newElements":
+        if (!Array.isArray(msg.data)) return;
+        document.dispatchEvent(
+            new CustomEvent("new-elements-added", {detail: {newElements: msg.data}})
+        );
+        break;
       case "listImages":
-        if(Array.isArray(message.data)) {
-          images = message.data;
-          document.dispatchEvent(
-              new CustomEvent("images-updated", {detail: {images: images}})
-          )
-        }
+        if (!Array.isArray(msg.data)) return;
+        document.dispatchEvent(
+            new CustomEvent("images-updated", {detail: {images: msg.data}})
+        );
+
         break;
       default:
     }
@@ -30,7 +45,8 @@ ws.addEventListener("message", (msg) => {
 
   }
 });
-ws.addEventListener("open",() => {
+
+ws.addEventListener("open", () => {
   console.log("opened web socket");
-  sendCommand("listImages");
+  sendCommand("playlist");
 });

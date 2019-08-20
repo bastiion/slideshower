@@ -11,38 +11,126 @@
     .slideshow > video.media-element {
       display: none;
     }
+
     .slideshow > img.media-element {
       display: block;
     }
+
     .slideshow[data-video-is-active] > img.media-element {
       display: none;
     }
+
     .slideshow[data-video-is-active] > video.media-element {
       display: block;
     }
 
 
     .media-element {
-        max-width: 100%;
-        max-height: 100vh;
+      max-width: 100%;
+      max-height: 100vh;
     }
   </style>
 </head>
 <body>
 <div class="slideshow">
   <img class="media-element" id="imgSlide" src="" alt="">
-  <video class="media-element" id="videoSlide" src="" alt="">
+  <video class="media-element" autoplay muted id="videoSlide" src="" alt=""></video>
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
 <script src="/public/client.js"></script>
 <script>
-  window.setInterval(() => {
-    if(images.length <= 0) return;
-    imageIndex++;
-    if(images.length <= imageIndex)
+  let playlist = [];
+  let imageIndex = -1;
+  let timer;
+  let started = false;
+
+  $(document).on("playlist-updated", (event) => {
+    const playl = event.detail.playlist;
+    if (!Array.isArray(playl)) {
+      playlist = [];
+      return;
+    }
+    playlist = playl;
+    if(!started) {
+      started = true;
+      nextSlide();
+    }
+  });
+
+  $(document).on("new-elements-added", (event) => {
+    const newElement = event.detail.newElements[0];
+    if(!newElement) return;
+    showMediaElement(newElement);
+
+  });
+  const slideshowElement = $(".slideshow");
+  const imgSlideELement = $("#imgSlide");
+  const videoSlideElement = $("#videoSlide");
+  videoSlideElement.on('ended', () => {
+    console.log('video ended will invoke nextSlide');
+    nextSlide();
+  });
+  $(document).keydown(function (e) {
+    switch (e.which) {
+      case 37: // left
+          nextSlide(-1);
+        break;
+      case 38: // up
+        break;
+      case 39: // right
+          nextSlide();
+        break;
+      case 40: // down
+        break;
+      default:
+        return; // exit this handler for other keys
+    }
+    e.preventDefault(); // prevent the default action (scroll / move caret)
+  });
+
+  function showMediaElement(mediaFile) {
+    //possibly clear the timer (if manually skipped this is important) and pause video
+    if(timer) {
+      window.clearTimeout(timer);
+    }
+    videoSlideElement[0].pause();
+    const mediaPath = uploadPath + mediaFile.fileName;
+    const isImage = mediaFile.mimeType.indexOf("image/") === 0;
+    const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
+    if (!isImage && !isVideo) return;
+
+    if (isVideo) {
+      slideshowElement.attr('data-video-is-active', true);
+      videoSlideElement.attr('src', mediaPath);
+    } else {
+      slideshowElement.attr('data-video-is-active', null);
+      imgSlideELement.attr('src', mediaPath);
+      timer = window.setTimeout(nextSlide, mediaFile.duration * 1000);
+    }
+
+  }
+
+  function nextSlide(addSubstractNum) {
+
+    if (playlist.length <= 0)
+      return;
+
+    let num = parseInt(addSubstractNum);
+    if(isNaN(num) || num === 0)
+      num = 1;
+
+    imageIndex += num;
+
+    if (playlist.length <= imageIndex)
       imageIndex = 0;
-    $("#imgSlide").attr('src', uploadPath + images[imageIndex]);
-  }, 5000)
+    if (imageIndex < 0)
+      imageIndex = playlist.length - 1;
+
+    const mediaFile = playlist[imageIndex];
+    showMediaElement(mediaFile);
+  }
+
+
 </script>
 
 </body>

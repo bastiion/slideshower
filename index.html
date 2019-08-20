@@ -18,7 +18,7 @@
         method="post">
     <div class="field">
       <label>Bild oder Video</label>
-      <input type="file" name="userFile" multiple />
+      <input type="file" name="userFile" multiple/>
     </div>
     <div class="field">
       <label>Dauer der Darstellung in Sekunden</label>
@@ -31,13 +31,32 @@
       </div>
     </div>
     <button class="ui button" type="submit">Medien zum Kunstwerk übermitteln</button>
-    <span id = "status"></span>
+    <span id="status"></span>
   </form>
 </div>
 <div class="ui text container sortable-content">
   <h1 class="ui dividing header">Playlist erstellen</h1>
-  <ul id="wrap" class="ui list">
-  </ul>
+  <div id="wrap" class="ui list items">
+  </div>
+</div>
+<div class="ui basic modal" id="confirmDeleteModal">
+  <div class="ui icon header">
+    <i class="archive icon"></i>
+    <span class="modal-title">Medien Element entfernen?</span>
+  </div>
+  <div class="content">
+    <p>Dies wird die Datei vom Server unwiderrufbar löschen und aus allen Playlists entfernen.</p>
+  </div>
+  <div class="actions">
+    <div class="ui red basic cancel inverted button">
+      <i class="remove icon"></i>
+      Nein
+    </div>
+    <div class="ui green ok inverted button confirm-media-element-delete-btn">
+      <i class="checkmark icon"></i>
+      Ja
+    </div>
+  </div>
 </div>
 <script src="jquery/dist/jquery.min.js"></script>
 <script src="jquery-form/dist/jquery.form.min.js"></script>
@@ -46,39 +65,66 @@
 <script src="semantic-ui/dist/semantic.js"></script>
 <script src="public/client.js"></script>
 <script>
-  $(document).ready(function() {
-    $(document).on("images-updated", (event) => {
-      const imgagesArr = event.detail.images;
-      if(!Array.isArray(imgagesArr)) return;
-      $("#wrap").empty();
-      for(let mediaFile of imgagesArr) {
-        const mediaPath = uploadPath + mediaFile;
-        $("#wrap").append(`
-<li>
-<div class="ui divided items">
-  <div class="item">
-    <div class="ui tiny image">
-      <img src='${mediaPath}'>
+
+  $(document).ready(function () {
+    let currentMediaElementItemJQ;
+
+    function showDeleteMediaElementConfirmModal(event) {
+      const dialog = $("#confirmDeleteModal");
+      currentMediaElementItemJQ = $(event.target).closest('.media-element-item')
+      $(".modal-title", dialog).text(`${currentMediaElementItemJQ.attr('data-media-element-file-name')} entfernen?`);
+      dialog.modal('show');
+    }
+
+    $(".confirm-media-element-delete-btn").on('click', (event) => {
+      deleteFile(currentMediaElementItemJQ.attr('data-media-element-file-name')).then(() => {
+        currentMediaElementItemJQ.remove();
+      });
+    });
+    $(document).on("playlist-updated", (event) => {
+      const playl = event.detail.playlist;
+      if (!Array.isArray(playl)) return;
+      const wrapElement = $("#wrap");
+      wrapElement.empty();
+
+      for (let mediaFile of playl) {
+        const mediaPath = uploadPath + mediaFile.fileName;
+        const isImage = mediaFile.mimeType.indexOf("image/") === 0;
+        const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
+        if (!isImage && !isVideo) continue;
+
+        const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
+
+        wrapElement.append(`
+  <div class="ui item media-element-item" data-media-element-id="${mediaFile.id}" data-media-element-file-name="${mediaFile.fileName}">
+    <div class="ui tiny images">
+    ${mediaElement}
     </div>
     <div class="middle aligned content">
-      ${mediaFile} <br>
-      Dauer in Sekunden<input type="number" name="duration" class="duration-change" value="20">
+      ${mediaFile.fileName} <br>
+      Dauer in Sekunden<input type="number" name="duration" class="duration-change" value="${mediaFile.duration}">
+      <div class="ui vertical animated button delete-media-btn" tabindex="0">
+        <div class="hidden content">delete</div>
+        <div class="visible content">
+          <i class="trash icon"></i>
+        </div>
+      </div>
     </div>
   </div>
-</li>
 `
         )
       }
-      $("#wrap").sortable();
+      $(".delete-media-btn", wrapElement).on('click', showDeleteMediaElementConfirmModal);
+      wrapElement.sortable();
     });
 
-    $('#uploadForm').submit(function() {
+    $('#uploadForm').submit(function () {
       $("#status").empty().text("File is uploading...");
       $(this).ajaxSubmit({
-        error: function(xhr) {
+        error: function (xhr) {
           status('Error: ' + xhr.status);
         },
-        success: function(response) {
+        success: function (response) {
           console.log(response);
           $("#status").empty().text(response);
         }
@@ -86,6 +132,7 @@
       return false;
     });
   });
+
 </script>
 </body>
 </html>

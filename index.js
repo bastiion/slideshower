@@ -5,10 +5,12 @@ const fs = require("fs");
 const spawn = require('child_process').spawn;
 const WebSocket = require("ws");
 const mongoose = require('mongoose');
+const mime = require('mime-types');
 
 const UPLOAD_DIR = process.cwd() + "/uploads";
 const UPLOAD_RELATIVE_URI = "/uploads";
 const MONGO_DB = "mongodb://localhost/test";
+const DEFAULT_DURATION = 5;
 
 // setup the Server ...
 
@@ -19,6 +21,7 @@ app.use(express.static("node_modules"));
 app.use(UPLOAD_RELATIVE_URI, express.static(UPLOAD_DIR));
 app.use('/public', express.static("public"));
 app.use(bodyParser.json());
+app.set('json spaces', 4);
 
 const server = app.listen(3000, () => {
   console.log("Working on port 3000");
@@ -37,6 +40,7 @@ db.once('open', () => {
 const MediaElementSchema = new mongoose.Schema({
   fileName: String,
   duration: Number,
+  mimeType: String,
   uploadDate: { type: Date, default: Date.now }
 });
 const MediaElement = mongoose.model('MediaElement', MediaElementSchema);
@@ -53,6 +57,22 @@ function sendListFiles(wsArr) {
           { command: "listImages", data: listing}));
     }
   });
+}
+
+function sendPlaylist(wsArr) {
+  MediaElement.find().exec().then(playlist => {
+    for(let ws of wsArr) {
+      ws.send(JSON.stringify(
+          { command: "playlist", data: playlist}));
+    }
+  });
+}
+
+function sendNewElements(elements, wsArr) {
+  for(let ws of wsArr) {
+    ws.send(JSON.stringify(
+        { command: "newElements", data: elements}));
+  }
 }
 
 // Websocket connection setup
@@ -75,6 +95,9 @@ wss.on('connection', ws => {
     try {
       const msg = JSON.parse(message);
       switch (msg.command) {
+        case "playlist":
+          sendPlaylist([ws]);
+          break;
         case "listImages":
           sendListFiles([ws]);
           break;
@@ -94,16 +117,11 @@ wss.on('connection', ws => {
 
 // prepare everything for the upload
 // we ease our live using the multer library, that does everything complicated for us
-
 const storage = multer.diskStorage({
   destination: (req, file, callback) => {
     callback(null, UPLOAD_DIR);
   },
   filename: (req, file, callback) => {
-    let duration = parseInt(req.body.duration);
-    if (!duration) {
-      duration = 10
-    }
     const f = file.originalname;
     const dotIndex = f.lastIndexOf(".");
     let ext = "", name = f;
@@ -113,8 +131,6 @@ const storage = multer.diskStorage({
     }
     const newFileName = name + '-' + Date.now() + ext;
     //add the MediaElement to the database
-    const mediaElement = new MediaElement({ fileName: newFileName, duration: duration});
-    mediaElement.save();
     //permanently store as ${newFileName}
     callback(null, newFileName);
   }
@@ -129,10 +145,67 @@ app.get('/', (req, res) => {
 });
 
 //the upload form post request
-app.post('/api/photo', (req, res) => {
+app.post('/api/photo', upload, (req, res) => {
+  console.log(req.files);
+  res.end("File has been uploaded");
+  if(!Array.isArray(req.files)) return;
+  let duration = parseInt(req.body.duration);
+  if (!duration) {
+    duration = DEFAULT_DURATION
+  }
+  const newMediaElements = req.files.map(file => {
+    const mimeType = mime.lookup(file.path);
+    return { fileName: file.filename, mimeType: mimeType, duration: duration}
+  });
+  MediaElement.create(newMediaElements).then((newElements) => {
+    sendPlaylist(wsAll);
+    sendNewElements(newElements, wsAll);
+  });
+});
+
+app.delete('/api/playlist', (req, res) => {
+  MediaElement.deleteMany({}, (err) => {
+    if(err) throw new Error("Cannot delete playlist", err);
+    res.sendStatus(204);
+  }).exec();
+});
+
+app.delete('/api/playlist/:id', (req, res) => {
+  MediaElement.findByIdAndDelete(req.params.id, (err) => {
+    if(err) throw new Error("Cannot delete file out of playlist", err);
+    res.sendStatus(204);
+  }).exec();
+});
+
+
+app.delete('/api/files/:fileName', (req, res, next) => {
+  let fileName = req.params.fileName;
+  MediaElement.deleteOne({fileName: fileName}, (err) => {
+    if(err) throw new Error("Cannot delete file out of playlist", err);
+  }).exec();
+  fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
+    if(err) throw new Error("Cannot remove file from disk", err);
+    res.sendStatus(204);
+  });
+});
+
+app.put('/api/playlist/recreate', (req, res) => {
+  fs.readdir(UPLOAD_DIR, (err, listing) => {
+    if(err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
+    for(let fileName of listing) {
+      const filePath = `${UPLOAD_DIR}/${fileName}`;
+      const mimeType = mime.lookup(filePath);
+      const mediaElement = new MediaElement({ fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
+      mediaElement.save();
+    }
+    res.sendStatus(204);
+  })
+});
+/*app.post('/api/photo', (req, res) => {
   upload(req, res, err => {
     //req.body
     //req.files
+    console.log(req.files);
     if (err) {
       return res.end("Error uploading file.");
     }
@@ -140,6 +213,10 @@ app.post('/api/photo', (req, res) => {
     sendListFiles(wsAll);
     res.end("File has been uploaded");
   });
+});*/
+
+app.get('/api/playlist', (req, res) => {
+  MediaElement.find().exec().then(playlist => res.json(playlist))
 });
 
 // this was a planed in order to launch a media player. can be omited or used
