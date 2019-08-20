@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sessions</title>
+  <link rel="stylesheet" href="/semantic-ui/dist/components/reset.css">
+  <link rel="stylesheet" href="/semantic-ui/dist/semantic.css">
+</head>
+<body>
+
+<div class="ui text container sortable-content">
+  <h1 class="ui dividing header">Aktive Slideshows</h1>
+  <div id="wrap" class="ui list items">
+  </div>
+</div>
+<script src="/jquery/dist/jquery.min.js"></script>
+<script src="/semantic-ui/dist/semantic.js"></script>
+<script src="/public/client.js"></script>
+<script>
+
+  $(document).ready(function () {
+
+    let playlist = [];
+    $(document).on("playlist-updated", (event) => {
+      playlist = event.detail.playlist;
+    });
+
+    $(document).on("sessions-updated", (event) => {
+      const sessions = event.detail.sessions;
+      const wrapElement = $("#wrap");
+      wrapElement.empty();
+
+      for (let session of sessions) {
+        const mediaPath = uploadPath + session.currentMediaElementFileName;
+        const isImage = true;
+        //const isImage = mediaFile.mimeType.indexOf("image/") === 0;
+        //const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
+        if (!isImage && !isVideo) continue;
+
+        const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
+        const volume = parseInt(session.playerVolume * 100);
+        wrapElement.append(`
+  <div class="ui item media-element-item" data-slideshow-id="${session._id}" data-slideshow-session-id="${session.sessionID}">
+    <div class="ui tiny images">
+    ${mediaElement}
+    </div>
+    <div class="middle aligned content">
+      ${session.sessionID} <br>
+      Volume <input class="range-input" type="range" min="0" max="100" value="${volume}">
+      <button class="ui compact labeled icon button player-pause-btn">
+        <i class="pause icon"></i> Pause
+      </button>
+      <div class="ui vertical animated button previous-slide-btn" tabindex="0">
+        <div class="hidden content">previous</div>
+        <div class="visible content">
+          <i class="chevron left icon"></i>
+        </div>
+      </div>
+      <div class="ui vertical animated button next-slide-btn" tabindex="1">
+        <div class="hidden content">next</div>
+        <div class="visible content">
+          <i class="chevron right icon"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+`
+        )
+      }
+
+      $(".range-input").on('change' , event => {
+        const newVolume = parseInt($(event.target).val()) / 100 ;
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("setPlayerVolume", {slideshowID: slideshowID,playerVolume: newVolume });
+      });
+      $(".next-slide-btn").on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+         sendCommand("nextSlideWish", {slideshowID: slideshowID});
+      });
+      $(".previous-slide-btn").on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("previousSlideWish", {slideshowID: slideshowID});
+      });
+      $(".player-pause-btn").on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        const sessionIndex = sessions.findIndex(sess => sess._id === slideshowID);
+        const session = sessions[sessionIndex];
+        if(session.playerPaused) {
+          sendCommand("videoPlayWish", {slideshowID: slideshowID});
+          session.playerPaused = false;
+        } else {
+          sendCommand("videoPauseWish", {slideshowID: slideshowID});
+          session.playerPaused = true;
+        }
+      });
+    });
+
+  });
+</script>
+</body>
+</html>

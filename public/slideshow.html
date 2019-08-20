@@ -44,6 +44,7 @@
   let imageIndex = -1;
   let timer;
   let started = false;
+  let paused = false;
 
   $(document).on("playlist-updated", (event) => {
     const playl = event.detail.playlist;
@@ -52,7 +53,7 @@
       return;
     }
     playlist = playl;
-    if(!started) {
+    if (!started) {
       started = true;
       nextSlide();
     }
@@ -60,7 +61,7 @@
 
   $(document).on("new-elements-added", (event) => {
     const newElement = event.detail.newElements[0];
-    if(!newElement) return;
+    if (!newElement) return;
     showMediaElement(newElement);
 
   });
@@ -74,12 +75,12 @@
   $(document).keydown(function (e) {
     switch (e.which) {
       case 37: // left
-          nextSlide(-1);
+        nextSlide(-1);
         break;
       case 38: // up
         break;
       case 39: // right
-          nextSlide();
+        nextSlide();
         break;
       case 40: // down
         break;
@@ -88,10 +89,40 @@
     }
     e.preventDefault(); // prevent the default action (scroll / move caret)
   });
+  $(document).on("player-volume-updated", (event) => {
+    //console.log(event);
+    const volume = event.detail.volume;
+    if(volume < 0.01) {
+      videoSlideElement[0].muted = true;
+    } else {
+      videoSlideElement[0].muted = false;
+    }
+    videoSlideElement[0].volume = volume;
+  });
+  $(document).on("slideshow-pause-wish", (event) => {
+    videoSlideElement[0].pause();
+    window.clearTimeout(timer);
+  });
+  $(document).on("slideshow-continue-wish", (event) => {
+    nextSlide();
+  });
+  $(document).on("video-play-wish", (event) => {
+    videoSlideElement[0].play();
+  });
+  $(document).on("video-pause-wish", (event) => {
+    videoSlideElement[0].pause();
+  });
+  $(document).on("next-slide-wish", (event) => {
+    nextSlide();
+  });
+  $(document).on("previous-slide-wish", (event) => {
+    nextSlide(-1);
+  });
 
   function showMediaElement(mediaFile) {
     //possibly clear the timer (if manually skipped this is important) and pause video
-    if(timer) {
+    updateSlideshowSession();
+    if (timer) {
       window.clearTimeout(timer);
     }
     videoSlideElement[0].pause();
@@ -122,7 +153,7 @@
       return;
 
     let num = parseInt(addSubstractNum);
-    if(isNaN(num) || num === 0)
+    if (isNaN(num) || num === 0)
       num = 1;
 
     imageIndex += num;
@@ -136,6 +167,17 @@
     showMediaElement(mediaFile);
   }
 
+  function updateSlideshowSession() {
+    const mediaFile = playlist[imageIndex];
+    sendCommand('sessionUpdate', {
+      currentMediaElementId: mediaFile._id,
+      currentMediaElementFileName: mediaFile.fileName,
+      currentMediaElementMimeType: mediaFile.mimeType,
+      playerVolume: videoSlideElement[0].volume,
+      playerPos: videoSlideElement[0].currentTime,
+      playerPaused: videoSlideElement[0].paused
+    });
+  }
 
 </script>
 
