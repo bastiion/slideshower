@@ -5,6 +5,14 @@
   <title>Sessions</title>
   <link rel="stylesheet" href="/semantic-ui/dist/components/reset.css">
   <link rel="stylesheet" href="/semantic-ui/dist/semantic.css">
+  <style>
+    .media-element-item .video-control {
+      visibility: hidden;
+    }
+    .media-element-item.is-video .video-control {
+      visibility: visible;
+    }
+  </style>
 </head>
 <body>
 
@@ -23,6 +31,138 @@
     let playlist = [];
     $(document).on("playlist-updated", (event) => {
       playlist = event.detail.playlist;
+      populatePlaylist($("#wrap"));
+
+    });
+
+    function bindEvents(parent) {
+      $(".range-input", parent).on('change', event => {
+        const newVolume = parseInt($(event.target).val()) / 100;
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("setPlayerVolume", {slideshowID: slideshowID, playerVolume: newVolume});
+      });
+      $(".next-slide-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("nextSlideWish", {slideshowID: slideshowID});
+      });
+      $(".previous-slide-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("previousSlideWish", {slideshowID: slideshowID});
+      });
+      $(".play-slide-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("slideshowPlayWish", {slideshowID: slideshowID});
+      });
+      $(".pause-slide-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("slideshowPauseWish", {slideshowID: slideshowID});
+      });
+      $(".player-play-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("videoPlayWish", {slideshowID: slideshowID});
+      });
+      $(".player-pause-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("videoPauseWish", {slideshowID: slideshowID});
+      });
+    }
+
+    function populatePlaylist(parent) {
+      const menuElement = $(".menu.media-item-chooser", parent);
+      menuElement.empty();
+      menuElement.each((i, elem) => {
+        const mediaElementItem = $(elem).closest('.media-element-item');
+        const currentMediaElementId = mediaElementItem.attr('data-current-media-element-id');
+        $(elem).append(playlist.map( item => {
+          const selectedClass = (item._id === currentMediaElementId) ? "active selected" : "";
+          return `<div class="item ${selectedClass}" data-media-element-id="${item._id}">${item.fileName}</div>`
+        }));
+      });
+      menuElement.closest('.dropdown').dropdown({
+        onChange: (value, text, selectedItem) => {
+          console.log(selectedItem);
+          const mediaElementID = $(selectedItem).attr('data-media-element-id');
+          const slideshowID = $(menuElement).closest('.media-element-item').attr('data-slideshow-id');
+          sendCommand("specificSlideWish", {slideshowID: slideshowID, mediaElementID: mediaElementID});
+        }
+      });
+    }
+
+    function createMediaItem(session) {
+      const slideshow = session.slideshow;
+      if (!slideshow) return null;
+      const mediaPath = uploadPath + slideshow.currentMediaElementFileName;
+      const mimeType =  slideshow.currentMediaElementMimeType;
+      const isImage = mimeType.indexOf("image/") === 0;
+      const isVideo = mimeType.indexOf("video/") === 0;
+      if (!isImage && !isVideo) return null;
+      const isVideoClass = isVideo ? "is-video" : "";
+      const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
+      const playOrPauseVideoBtn = slideshow.playerPaused ? "play" : "pause";
+      const videoPlayingOrPaused = slideshow.playerPaused ? "paused" : "playing";
+      const playOrPauseSlideshowBtn = slideshow.slideshowPaused ? "play" : "pause";
+      const volume = parseInt(slideshow.playerVolume * 100);
+      return `
+  <div class="ui item media-element-item ${isVideoClass}"
+    data-slideshow-id="${session._id}"
+    data-slideshow-session-id="${session.sessionID}"
+    data-player-state="${videoPlayingOrPaused}"
+    data-current-media-element-id="${slideshow.currentMediaElementId}"
+    >
+    <div class="ui tiny images">
+    ${mediaElement}
+    </div>
+    <div class="middle aligned content">
+      <div class="ui fluid search selection dropdown">
+        <input type="hidden" name="media-item-input">
+        <i class="dropdown icon"></i>
+        <div class="text">${slideshow.currentMediaElementFileName}</div>
+        <div class="menu media-item-chooser">
+        </div>
+      </div>
+      <div class="ui vertical animated button previous-slide-btn" tabindex="0">
+        <div class="hidden content">previous</div>
+        <div class="visible content">
+          <i class="chevron left icon"></i>
+        </div>
+      </div>
+      <div class="ui button ${playOrPauseSlideshowBtn}-slide-btn" tabindex="1">
+        <i class="${playOrPauseSlideshowBtn} icon"></i>
+      </div>
+      <div class="ui vertical animated button next-slide-btn" tabindex="2">
+        <div class="hidden content">next</div>
+        <div class="visible content">
+          <i class="chevron right icon"></i>
+        </div>
+      </div>
+      <div class="video-control">
+        Volume <input class="range-input" type="range" min="0" max="100" value="${volume}">
+        <button class="ui compact labeled icon button player-${playOrPauseVideoBtn}-btn">
+          <i class="${playOrPauseVideoBtn} icon"></i> ${playOrPauseVideoBtn.toUpperCase()}
+        </button>
+      </div>
+    </div>
+  </div>
+`
+    }
+
+    $(document).on("session-updated", (event) => {
+      const session = event.detail.session;
+      if (!session) return;
+      const slideshowSessionID = session._id;
+      if (!slideshowSessionID) return;
+      const mediaElementHtml = createMediaItem(session);
+      if (mediaElementHtml) {
+        const mediaElement = $(mediaElementHtml)
+        const oldMediaElement = $(`.media-element-item[data-slideshow-id="${slideshowSessionID}"]`);
+        if (oldMediaElement.length > 0) {
+          oldMediaElement.replaceWith(mediaElement);
+        } else {
+          $("#wrap").append(mediaElement);
+        }
+        bindEvents(mediaElement);
+        populatePlaylist(mediaElement);
+      }
     });
 
     $(document).on("sessions-updated", (event) => {
@@ -31,68 +171,13 @@
       wrapElement.empty();
 
       for (let session of sessions) {
-        const mediaPath = uploadPath + session.currentMediaElementFileName;
-        const isImage = true;
-        //const isImage = mediaFile.mimeType.indexOf("image/") === 0;
-        //const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
-        if (!isImage && !isVideo) continue;
-
-        const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
-        const volume = parseInt(session.playerVolume * 100);
-        wrapElement.append(`
-  <div class="ui item media-element-item" data-slideshow-id="${session._id}" data-slideshow-session-id="${session.sessionID}">
-    <div class="ui tiny images">
-    ${mediaElement}
-    </div>
-    <div class="middle aligned content">
-      ${session.sessionID} <br>
-      Volume <input class="range-input" type="range" min="0" max="100" value="${volume}">
-      <button class="ui compact labeled icon button player-pause-btn">
-        <i class="pause icon"></i> Pause
-      </button>
-      <div class="ui vertical animated button previous-slide-btn" tabindex="0">
-        <div class="hidden content">previous</div>
-        <div class="visible content">
-          <i class="chevron left icon"></i>
-        </div>
-      </div>
-      <div class="ui vertical animated button next-slide-btn" tabindex="1">
-        <div class="hidden content">next</div>
-        <div class="visible content">
-          <i class="chevron right icon"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-`
-        )
+        const mediaElement = createMediaItem(session);
+        if (mediaElement)
+          wrapElement.append(mediaElement)
       }
+      bindEvents(wrapElement);
+      populatePlaylist(wrapElement);
 
-      $(".range-input").on('change' , event => {
-        const newVolume = parseInt($(event.target).val()) / 100 ;
-        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
-        sendCommand("setPlayerVolume", {slideshowID: slideshowID,playerVolume: newVolume });
-      });
-      $(".next-slide-btn").on('click', event => {
-        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
-         sendCommand("nextSlideWish", {slideshowID: slideshowID});
-      });
-      $(".previous-slide-btn").on('click', event => {
-        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
-        sendCommand("previousSlideWish", {slideshowID: slideshowID});
-      });
-      $(".player-pause-btn").on('click', event => {
-        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
-        const sessionIndex = sessions.findIndex(sess => sess._id === slideshowID);
-        const session = sessions[sessionIndex];
-        if(session.playerPaused) {
-          sendCommand("videoPlayWish", {slideshowID: slideshowID});
-          session.playerPaused = false;
-        } else {
-          sendCommand("videoPauseWish", {slideshowID: slideshowID});
-          session.playerPaused = true;
-        }
-      });
     });
 
   });

@@ -9,6 +9,7 @@ const spawn = require('child_process').spawn;
 const WebSocket = require("ws");
 const mongoose = require('mongoose');
 const mime = require('mime-types');
+const _ = require('lodash');
 
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
 const UPLOAD_DIR = process.cwd() + "/uploads";
@@ -60,112 +61,169 @@ const MediaElementSchema = new mongoose.Schema({
 });
 const MediaElement = mongoose.model('MediaElement', MediaElementSchema);
 
+
 const SlideshowSessionSchema = new mongoose.Schema({
   sessionID: String,
-  currentMediaElementId: String,
-  currentMediaElementFileName: String,
-  currentMediaElementMimeType: String,
-  playerVolume: Number,
-  playerPos: Number,
-  playerPaused: Boolean
+  slideshow: {
+    required: false,
+    type: {
+      currentMediaElementId: String,
+      currentMediaElementFileName: String,
+      currentMediaElementMimeType: String,
+      playerVolume: Number,
+      playerPos: Number,
+      playerPaused: Boolean,
+      slideshowPaused: Boolean
+    }
+  }
 });
 const SlideshowSession = mongoose.model('SlieshowSession', SlideshowSessionSchema);
+
+SlideshowSession.deleteMany({}, (err) => {
+  if(err) console.error("Cannot clear slideshow sessions on startup", err);
+});
+
+/**
+ * send JSON or string data  to one or more WebSocket clients
+ * @param {WebSocket[]|WebSocket} ws = the WebSocket clients
+ * @param {string|object} data - the data to sent, if an object is passed it will be stringified
+ * @returns {null|boolean}
+ */
+function sendDataToWS(ws, data) {
+  if (!ws) {
+    console.error("Cannot send data, because Websocket is not present");
+    return null;
+  }
+  let wsClients = ws;
+  let _data = data;
+  if (_.isObject(data)) _data = JSON.stringify(data);
+  if (!Array.isArray(ws)) wsClients = [ws];
+  for (let wsClient of wsClients) {
+    try {
+      wsClient.send(_data)
+    } catch (e) {
+      console.error("cannot send to websocket client", e)
+    }
+  }
+  return true;
+}
 
 /**
  * send a listing of all files in the UPLOAD_DIR to all}
  * websocket clients in wsArr
- * @param wsArr: Array[WebSocket]
+ * @param {WebSocket[]|WebSocket} wsArr - the WebSocket clients
  */
 function sendListFiles(wsArr) {
   fs.readdir(UPLOAD_DIR, (err, listing) => {
-    for (let ws of wsArr) {
-      ws.send(JSON.stringify(
-          {command: "listImages", data: listing}));
+    if(err) {
+      console.error("cannot list directory content", err);
+      return;
     }
+    sendDataToWS(wsArr, {command: "listImages", data: listing});
   });
 }
 
 function sendPlaylist(wsArr) {
   MediaElement.find().sort({'orderIndex': 'asc'}).exec().then(playlist => {
-    for (let ws of wsArr) {
-      ws.send(JSON.stringify(
-          {command: "playlist", data: playlist}));
-    }
+    sendDataToWS(wsArr, {command: "playlist", data: playlist});
   });
 }
 
 function sendSlideshowSessions(wsArr) {
-  SlideshowSession.find().sort({'sessionID': 'asc'}).exec().then(sessions => {
-    for (let ws of wsArr) {
-      ws.send(JSON.stringify(
-          {command: "slideshowSessions", data: sessions}));
-    }
+  SlideshowSession.find({slideshow: {$exists: true}}).sort({'sessionID': 'asc'}).exec().then(sessions => {
+    sendDataToWS(wsArr, {command: "slideshowSessions", data: sessions});
   });
 }
-
-function sendNewElements(elements, wsArr) {
-  for (let ws of wsArr) {
-    ws.send(JSON.stringify(
-        {command: "newElements", data: elements}));
-  }
-}
-function sendPlayerVolumeUpdate(volume, wsArr) {
-  for (let ws of wsArr) {
-    ws.send(JSON.stringify(
-        {command: "updatePlayerVolume", data: volume}));
-  }
-}
-
 
 // Websocket connection setup
 
 const wss = new WebSocket.Server({server: server});
 
 //each connected websocket client will be in the following array
-const wsAllMap = [];
-
-function wsAll() {
-  return wsAllMap.map(item => item.ws);
-}
-
-function sessionIDForWS(ws) {
-  const index = wsAllMap.findIndex(item => item.ws === ws);
-  if (index >= 0) {
-    return wsAllMap[index].sessionID;
+class WebsocketClientMap {
+  
+  constructor() {
+    this.wsAllMap = [];
   }
-  return null;
-}
-function wsForSessionID(sessionID) {
-  const index = wsAllMap.findIndex(item => item.sessionID === sessionID);
-  if (index >= 0) {
-    return wsAllMap[index].ws;
+  
+  wsAll() {
+    return this.wsAllMap.map(item => item.ws);
   }
-  return null;
+
+  addWebsocketClient(client) {
+    this.wsAllMap.push(client);
+  }
+
+  removeWebSocketClient(ws) {
+    const index = this.wsAllMap.findIndex(item => item.ws === ws);
+    if (index >= 0) {
+      this.wsAllMap.splice(index, 1);
+    }
+  }
+
+  slideSessionIDByWS(ws) {
+    const index = this.wsAllMap.findIndex(item => item.ws === ws);
+    if (index >= 0) {
+      return this.wsAllMap[index].slideshowSessionID;
+    }
+    return null;
+  }
+  wsBySlideSessionID(slideSessionID) {
+    const index = this.wsAllMap.findIndex(item => item.slideshowSessionID === slideSessionID);
+    if (index >= 0) {
+      return this.wsAllMap[index].ws;
+    }
+    return null;
+  }
+  
+  sendBySlideSessionID(slideSessionID, data) {
+    if(!slideSessionID) {
+      console.error("no slide session id given");
+      return null;
+    }
+    const ws = this.wsBySlideSessionID(slideSessionID);
+    sendDataToWS(ws, data);
+  }
+  
 }
+
+const wsm = new WebsocketClientMap();
 
 wss.on('connection', (ws, req) => {
 
 
   //here we try to get the session of the WebSocket
   cookieParserInstance(req, null, function (err) {
+    if(err) {
+      console.error("Cannot parse signed Cookies", err);
+      return;
+    }
     const sessionID = req.signedCookies['connect.sid'];
-    console.log(sessionID);
-    wsAllMap.push({
-      sessionID: sessionID,
-      ws: ws
-    });
-    /*mongoStore.get(sessionID, (err, session ) => {
+    SlideshowSession.create({sessionID: sessionID}, (err, slideshowSession) => {
       if(err) {
-        console.error("Cannot get session for WebSocket connection", err);
+        console.error("Cannot create SlideshowSession in database", err);
         return;
       }
-      console.log(session);
-    });*/
+      wsm.addWebsocketClient({
+        sessionID: sessionID,
+        slideshowSessionID: slideshowSession._id.toString(),
+        ws: ws
+      });
+    });
   });
 
   ws.on('close', message => {
-    wsAllMap.splice(wsAll().indexOf(ws), 1);
-    SlideshowSession.deleteOne({sessionID: sessionIDForWS(ws)}).exec();
+    const slideSessionID = wsm.slideSessionIDByWS(ws);
+    wsm.removeWebSocketClient(ws);
+    if(slideSessionID) {
+      SlideshowSession.deleteOne({_id: slideSessionID}, (err) => {
+        if(err) {
+          console.error("Cannot delete SlideshowSession even though the websocket session has ended", err);
+          return;
+        }
+        sendSlideshowSessions(wsm.wsAll());
+      });
+    }
   });
 
   ws.on('message', message => {
@@ -179,66 +237,54 @@ wss.on('connection', (ws, req) => {
         case "listImages":
           sendListFiles([ws]);
           break;
-        case "setPlayerVolume":
-          SlideshowSession.findById(msg.data.slideshowID, (err, slideshowSession) => {
-            const ws = wsForSessionID(slideshowSession.sessionID);
-            sendPlayerVolumeUpdate(msg.data.playerVolume, [ws]);
+        case "sessionUpdate":
+          //console.log(msg.data);
+          const slideSessionID = wsm.slideSessionIDByWS(ws);
+          SlideshowSession.findById(slideSessionID, (err, slideshowSession) => {
+            if (err) {
+              console.error("cannot create or update  SlideshowSession", err);
+              return;
+            }
+            slideshowSession.slideshow = msg.data;
+            slideshowSession.save((err, _slideSession) => {
+              if(err) {
+                console.error("cannot update SLideshowSession", err);
+                return;
+              }
+              sendDataToWS(wsm.wsAll(), {command: "slideshowSession", data: _slideSession});
+              //sendSlideshowSessions(wsm.wsAll());
+            })
           });
           break;
-        case "sessionUpdate":
-          console.log(msg.data);
-          const sessionID = sessionIDForWS(ws);
-          const slideshowSessionObject = {
-            ...msg.data,
-            sessionID: sessionIDForWS(ws)
-          };
-          SlideshowSession.updateOne({sessionID: sessionID}, slideshowSessionObject, {
-            upsert: true,
-            setDefaultsOnInsert: true
-          }, (err) => {
-            if(err) {
-              console.error("cannot create or update  SlideshowSession", err);
-            }
-          });
-          sendSlideshowSessions(wsAll());
+        case "setPlayerVolume":
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "updatePlayerVolume", data: msg.data.playerVolume});
           break;
         case "nextSlideWish":
-          SlideshowSession.findById(msg.data.slideshowID, (err, slideshowSession) => {
-            const ws = wsForSessionID(slideshowSession.sessionID);
-            ws.send(JSON.stringify({command: "nextSlideWish"}));
-          });
-
+           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "nextSlideWish"});
+          break;
+        case "specificSlideWish":
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "specificSlideWish", data: msg.data.mediaElementID});
           break;
         case "previousSlideWish":
-          SlideshowSession.findById(msg.data.slideshowID, (err, slideshowSession) => {
-            const ws = wsForSessionID(slideshowSession.sessionID);
-            ws.send(JSON.stringify({command: "previousSlideWish"}));
-          });
-
+           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "previousSlideWish"});
           break;
         case "videoPauseWish":
-          SlideshowSession.findById(msg.data.slideshowID, (err, slideshowSession) => {
-            const ws = wsForSessionID(slideshowSession.sessionID);
-            ws.send(JSON.stringify({command: "videoPauseWish"}));
-          });
-
+           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPauseWish"});
           break;
         case "videoPlayWish":
-          SlideshowSession.findById(msg.data.slideshowID, (err, slideshowSession) => {
-            const ws = wsForSessionID(slideshowSession.sessionID);
-            ws.send(JSON.stringify({command: "videoPlayWish"}));
-          });
-
+           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPlayWish"});
+          break;
+        case "slideshowPauseWish":
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "slideshowPauseWish"});
+          break;
+        case "slideshowPlayWish":
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "slideshowPlayWish"});
           break;
         default:
-          ws.send(JSON.stringify({
-            answer: 42
-          }));
-
       }
 
     } catch (e) {
-      console.error("An error pccured while processing the websocket request", e)
+      console.error("An error occured while processing the websocket request", e)
     }
   });
 
@@ -286,26 +332,30 @@ app.post('/api/photo', upload, (req, res) => {
     const mimeType = mime.lookup(file.path);
     return {fileName: file.filename, mimeType: mimeType, duration: duration}
   });
-  MediaElement.create(newMediaElements).then((newElements) => {
-    sendPlaylist(wsAll());
-    sendNewElements(newElements, wsAll());
+  MediaElement.create(newMediaElements, (err, newElements) => {
+    if(err) {
+      console.error("cannot create new MediaElement in DB", err);
+      return;
+    }
+    sendPlaylist(wsm.wsAll());
+    sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
   });
 });
 
 app.delete('/api/playlist', (req, res) => {
   MediaElement.deleteMany({}, (err) => {
     if (err) throw new Error("Cannot delete playlist", err);
-    sendPlaylist(wsAll());
+    sendPlaylist(wsm.wsAll());
     res.sendStatus(204);
-  }).exec();
+  });
 });
 
 app.delete('/api/playlist/:id', (req, res) => {
   MediaElement.findByIdAndDelete(req.params.id, (err) => {
     if (err) throw new Error("Cannot delete file out of playlist", err);
-    sendPlaylist(wsAll());
+    sendPlaylist(wsm.wsAll());
     res.sendStatus(204);
-  }).exec();
+  });
 });
 
 app.post('/api/playlist/:id', (req, res) => {
@@ -319,7 +369,7 @@ app.post('/api/playlist/:id', (req, res) => {
     mediaFile.duration = duration;
     mediaFile.save();
     res.sendStatus(204);
-  }).exec();
+  });
 });
 
 
@@ -327,7 +377,7 @@ app.delete('/api/files/:fileName', (req, res, next) => {
   let fileName = req.params.fileName;
   MediaElement.deleteOne({fileName: fileName}, (err) => {
     if (err) throw new Error("Cannot delete file out of playlist", err);
-  }).exec();
+  });
   fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
     if (err) throw new Error("Cannot remove file from disk", err);
     res.sendStatus(204);
@@ -349,7 +399,7 @@ app.post('/api/playlist', (req, res) => {
     });
     return promise;
   })).then(() => {
-    sendPlaylist(wsAll());
+    sendPlaylist(wsm.wsAll());
     res.sendStatus(204);
   })
 });
@@ -379,7 +429,7 @@ app.get('/api/session', (req, res) => {
       return res.end("Error uploading file.");
     }
     //inform all clients about the new media elements
-    sendListFiles(wsAll());
+    sendListFiles(wsm.wsAll());
     res.end("File has been uploaded");
   });
 });*/

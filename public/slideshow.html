@@ -42,6 +42,7 @@
 <script>
   let playlist = [];
   let imageIndex = -1;
+  let currentMediaFile;
   let timer;
   let started = false;
   let paused = false;
@@ -68,9 +69,17 @@
   const slideshowElement = $(".slideshow");
   const imgSlideELement = $("#imgSlide");
   const videoSlideElement = $("#videoSlide");
+  videoSlideElement.on('pause', () => {
+    updateSlideshowSession()
+  });
+  videoSlideElement.on('play', () => {
+    updateSlideshowSession()
+  });
   videoSlideElement.on('ended', () => {
-    console.log('video ended will invoke nextSlide');
-    nextSlide();
+    if(!paused) {
+      console.log('video ended will invoke nextSlide');
+      nextSlide();
+    }
   });
   $(document).keydown(function (e) {
     switch (e.which) {
@@ -100,10 +109,13 @@
     videoSlideElement[0].volume = volume;
   });
   $(document).on("slideshow-pause-wish", (event) => {
+    paused = true;
     videoSlideElement[0].pause();
     window.clearTimeout(timer);
+    updateSlideshowSession();
   });
-  $(document).on("slideshow-continue-wish", (event) => {
+  $(document).on("slideshow-play-wish", (event) => {
+    paused = false;
     nextSlide();
   });
   $(document).on("video-play-wish", (event) => {
@@ -115,12 +127,20 @@
   $(document).on("next-slide-wish", (event) => {
     nextSlide();
   });
+  $(document).on("specific-slide-wish", (event) => {
+    const mediaElementID =  event.detail.mediaElementID;
+    const index = playlist.findIndex(item => item._id === mediaElementID);
+    if(index >= 0) {
+      showMediaElement(playlist[index]);
+    }
+  });
   $(document).on("previous-slide-wish", (event) => {
     nextSlide(-1);
   });
 
   function showMediaElement(mediaFile) {
     //possibly clear the timer (if manually skipped this is important) and pause video
+    currentMediaFile = mediaFile;
     updateSlideshowSession();
     if (timer) {
       window.clearTimeout(timer);
@@ -138,7 +158,9 @@
       } else {
         slideshowElement.attr('data-video-is-active', null);
         imgSlideELement.attr('src', mediaPath);
-        timer = window.setTimeout(nextSlide, mediaFile.duration * 1000 + 200);
+        if(!paused) {
+          timer = window.setTimeout(nextSlide, mediaFile.duration * 1000 + 200);
+        }
       }
       setTimeout(() => {
         slideshowElement[0].fadeIn(duration = 250, easing = 'linear', complete = null)
@@ -168,14 +190,15 @@
   }
 
   function updateSlideshowSession() {
-    const mediaFile = playlist[imageIndex];
+    const mediaFile = currentMediaFile || playlist[imageIndex];
     sendCommand('sessionUpdate', {
       currentMediaElementId: mediaFile._id,
       currentMediaElementFileName: mediaFile.fileName,
       currentMediaElementMimeType: mediaFile.mimeType,
       playerVolume: videoSlideElement[0].volume,
       playerPos: videoSlideElement[0].currentTime,
-      playerPaused: videoSlideElement[0].paused
+      playerPaused: videoSlideElement[0].paused,
+      slideshowPaused: paused,
     });
   }
 

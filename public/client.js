@@ -71,6 +71,11 @@ getPlaylist().then((res) => {
               new CustomEvent("sessions-updated", {detail: {sessions: msg.data}})
           );
           break;
+        case "slideshowSession":
+          document.dispatchEvent(
+              new CustomEvent("session-updated", {detail: {session: msg.data}})
+          );
+          break;
 
         case "updatePlayerVolume":
           document.dispatchEvent(
@@ -87,14 +92,29 @@ getPlaylist().then((res) => {
               new CustomEvent("previous-slide-wish")
           );
           break;
+        case "specificSlideWish":
+          document.dispatchEvent(
+              new CustomEvent("specific-slide-wish",{detail: {mediaElementID: msg.data}})
+          );
+          break;
         case "videoPlayWish":
           document.dispatchEvent(
-              new CustomEvent("video-play-wish")
+              new CustomEvent("video-play-wish", {detail: {volume: msg.data}})
           );
           break;
         case "videoPauseWish":
           document.dispatchEvent(
               new CustomEvent("video-pause-wish")
+          );
+          break;
+        case "slideshowPlayWish":
+          document.dispatchEvent(
+              new CustomEvent("slideshow-play-wish")
+          );
+          break;
+        case "slideshowPauseWish":
+          document.dispatchEvent(
+              new CustomEvent("slideshow-pause-wish")
           );
           break;
         case "listImages":
