@@ -23,6 +23,7 @@
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
 <script src="/semantic-ui/dist/semantic.js"></script>
+<script src="/robust-websocket/robust-websocket.js"></script>
 <script src="/public/client.js"></script>
 <script>
 
@@ -80,7 +81,6 @@
       });
       menuElement.closest('.dropdown').dropdown({
         onChange: (value, text, selectedItem) => {
-          console.log(selectedItem);
           const mediaElementID = $(selectedItem).attr('data-media-element-id');
           const slideshowID = $(menuElement).closest('.media-element-item').attr('data-slideshow-id');
           sendCommand("specificSlideWish", {slideshowID: slideshowID, mediaElementID: mediaElementID});
@@ -94,7 +94,7 @@
       const mediaPath = uploadPath + slideshow.currentMediaElementFileName;
       const mimeType =  slideshow.currentMediaElementMimeType;
       const isImage = mimeType.indexOf("image/") === 0;
-      const isVideo = mimeType.indexOf("video/") === 0;
+      const isVideo = mimeType.indexOf("video/") === 0 || mimeType.indexOf("audio/") === 0;
       if (!isImage && !isVideo) return null;
       const isVideoClass = isVideo ? "is-video" : "";
       const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
@@ -180,6 +180,8 @@
 
     });
 
+    emitResult(getPlaylist, "playlist-updated", "playlist");
+    emitResult(getSessions, "sessions-updated", "sessions");
   });
 </script>
 </body>

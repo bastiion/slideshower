@@ -63,6 +63,7 @@
 <script src="sortablejs/Sortable.js"></script>
 <script src="jquery-sortablejs/jquery-sortable.js"></script>
 <script src="semantic-ui/dist/semantic.js"></script>
+<script src="robust-websocket/robust-websocket.js"></script>
 <script src="public/client.js"></script>
 <script>
 
@@ -89,8 +90,9 @@
 
       for (let mediaFile of playl) {
         const mediaPath = uploadPath + mediaFile.fileName;
-        const isImage = mediaFile.mimeType.indexOf("image/") === 0;
-        const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
+        const mimeType = mediaFile.mimeType;
+        const isImage = mimeType.indexOf("image/") === 0;
+        const isVideo = mimeType.indexOf("video/") === 0 || mimeType.indexOf("audio/") === 0;
         if (!isImage && !isVideo) continue;
 
         const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
@@ -139,18 +141,23 @@
     });
 
     $('#uploadForm').submit(function () {
-      $("#status").empty().text("File is uploading...");
+      const status = $("#status")
+      status.empty().text("File is uploading...");
       $(this).ajaxSubmit({
         error: function (xhr) {
-          status('Error: ' + xhr.status);
+          status.empty().text('Error: ' + xhr.status);
         },
         success: function (response) {
           console.log(response);
-          $("#status").empty().text(response);
+          status.empty().text(response);
         }
       });
       return false;
     });
+
+
+    emitResult(getPlaylist, "playlist-updated", "playlist");
+
   });
 
 </script>

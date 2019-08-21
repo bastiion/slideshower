@@ -80,7 +80,7 @@ const SlideshowSessionSchema = new mongoose.Schema({
 const SlideshowSession = mongoose.model('SlieshowSession', SlideshowSessionSchema);
 
 SlideshowSession.deleteMany({}, (err) => {
-  if(err) console.error("Cannot clear slideshow sessions on startup", err);
+  if (err) console.error("Cannot clear slideshow sessions on startup", err);
 });
 
 /**
@@ -115,7 +115,7 @@ function sendDataToWS(ws, data) {
  */
 function sendListFiles(wsArr) {
   fs.readdir(UPLOAD_DIR, (err, listing) => {
-    if(err) {
+    if (err) {
       console.error("cannot list directory content", err);
       return;
     }
@@ -141,11 +141,11 @@ const wss = new WebSocket.Server({server: server});
 
 //each connected websocket client will be in the following array
 class WebsocketClientMap {
-  
+
   constructor() {
     this.wsAllMap = [];
   }
-  
+
   wsAll() {
     return this.wsAllMap.map(item => item.ws);
   }
@@ -168,6 +168,7 @@ class WebsocketClientMap {
     }
     return null;
   }
+
   wsBySlideSessionID(slideSessionID) {
     const index = this.wsAllMap.findIndex(item => item.slideshowSessionID === slideSessionID);
     if (index >= 0) {
@@ -175,16 +176,16 @@ class WebsocketClientMap {
     }
     return null;
   }
-  
+
   sendBySlideSessionID(slideSessionID, data) {
-    if(!slideSessionID) {
+    if (!slideSessionID) {
       console.error("no slide session id given");
       return null;
     }
     const ws = this.wsBySlideSessionID(slideSessionID);
     sendDataToWS(ws, data);
   }
-  
+
 }
 
 const wsm = new WebsocketClientMap();
@@ -194,13 +195,13 @@ wss.on('connection', (ws, req) => {
 
   //here we try to get the session of the WebSocket
   cookieParserInstance(req, null, function (err) {
-    if(err) {
+    if (err) {
       console.error("Cannot parse signed Cookies", err);
       return;
     }
     const sessionID = req.signedCookies['connect.sid'];
     SlideshowSession.create({sessionID: sessionID}, (err, slideshowSession) => {
-      if(err) {
+      if (err) {
         console.error("Cannot create SlideshowSession in database", err);
         return;
       }
@@ -215,9 +216,9 @@ wss.on('connection', (ws, req) => {
   ws.on('close', message => {
     const slideSessionID = wsm.slideSessionIDByWS(ws);
     wsm.removeWebSocketClient(ws);
-    if(slideSessionID) {
+    if (slideSessionID) {
       SlideshowSession.deleteOne({_id: slideSessionID}, (err) => {
-        if(err) {
+        if (err) {
           console.error("Cannot delete SlideshowSession even though the websocket session has ended", err);
           return;
         }
@@ -247,7 +248,7 @@ wss.on('connection', (ws, req) => {
             }
             slideshowSession.slideshow = msg.data;
             slideshowSession.save((err, _slideSession) => {
-              if(err) {
+              if (err) {
                 console.error("cannot update SLideshowSession", err);
                 return;
               }
@@ -260,19 +261,19 @@ wss.on('connection', (ws, req) => {
           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "updatePlayerVolume", data: msg.data.playerVolume});
           break;
         case "nextSlideWish":
-           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "nextSlideWish"});
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "nextSlideWish"});
           break;
         case "specificSlideWish":
           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "specificSlideWish", data: msg.data.mediaElementID});
           break;
         case "previousSlideWish":
-           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "previousSlideWish"});
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "previousSlideWish"});
           break;
         case "videoPauseWish":
-           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPauseWish"});
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPauseWish"});
           break;
         case "videoPlayWish":
-           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPlayWish"});
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "videoPlayWish"});
           break;
         case "slideshowPauseWish":
           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "slideshowPauseWish"});
@@ -333,7 +334,7 @@ app.post('/api/photo', upload, (req, res) => {
     return {fileName: file.filename, mimeType: mimeType, duration: duration}
   });
   MediaElement.create(newMediaElements, (err, newElements) => {
-    if(err) {
+    if (err) {
       console.error("cannot create new MediaElement in DB", err);
       return;
     }
@@ -358,18 +359,18 @@ app.delete('/api/playlist/:id', (req, res) => {
   });
 });
 
-app.post('/api/playlist/:id', (req, res) => {
+app.post('/api/playlist/:id', (req, res, next) => {
   const duration = parseInt(req.body.duration);
   if (isNaN(duration)) {
     throw new Error("duration is not a number");
   }
 
-  MediaElement.findById(req.params.id, (err, mediaFile) => {
+  MediaElement.findById(req.params.id).exec((err, mediaFile) => {
     if (err) throw new Error("Cannot find file  inplaylist", err);
     mediaFile.duration = duration;
     mediaFile.save();
     res.sendStatus(204);
-  });
+  })
 });
 
 
@@ -384,24 +385,21 @@ app.delete('/api/files/:fileName', (req, res, next) => {
   });
 });
 
-app.post('/api/playlist', (req, res) => {
-  Promise.all(req.body.playlist.map(item => {
-    let resolve, reject;
-    let promise = new Promise((_resolve, _reject) => {
-      resolve = _resolve;
-      reject = _reject;
-    });
-    MediaElement.findById(item._id, (err, mediaFile) => {
-      const orderIndex = parseInt(item.oderIndex);
-      if (!isNaN(orderIndex)) return;
-      mediaFile.orderIndex = item.orderIndex;
-      mediaFile.save().then(resolve, reject)
-    });
-    return promise;
-  })).then(() => {
-    sendPlaylist(wsm.wsAll());
-    res.sendStatus(204);
-  })
+app.post('/api/playlist', (req, res, next) => {
+  Promise.all(req.body.playlist.map(item =>
+      MediaElement.findById(item._id).exec().then(
+          (mediaFile) => {
+            const orderIndex = parseInt(item.oderIndex);
+            if (!isNaN(orderIndex)) throw new Error("orderIndex is not a number");
+            mediaFile.orderIndex = item.orderIndex;
+            return mediaFile.save()
+          })
+  ))
+      .then(() => {
+        sendPlaylist(wsm.wsAll());
+        res.sendStatus(204);
+      })
+      .catch(next);
 });
 
 app.put('/api/playlist/recreate', (req, res) => {
@@ -417,25 +415,16 @@ app.put('/api/playlist/recreate', (req, res) => {
   })
 });
 
-app.get('/api/session', (req, res) => {
-
+app.get('/api/session', (req, res, next) => {
+  SlideshowSession.find({slideshow: {$exists: true}}).sort({'sessionID': 'asc'}).exec()
+      .then(sessions => res.json(sessions))
+      .catch(next);
 });
-/*app.post('/api/photo', (req, res) => {
-  upload(req, res, err => {
-    //req.body
-    //req.files
-    console.log(req.files);
-    if (err) {
-      return res.end("Error uploading file.");
-    }
-    //inform all clients about the new media elements
-    sendListFiles(wsm.wsAll());
-    res.end("File has been uploaded");
-  });
-});*/
 
-app.get('/api/playlist', (req, res) => {
-  MediaElement.find().sort({'orderIndex': 'asc'}).exec().then(playlist => res.json(playlist))
+app.get('/api/playlist', (req, res, next) => {
+  MediaElement.find().sort({'orderIndex': 'asc'}).exec()
+      .then(playlist => res.json(playlist))
+      .catch(next)
 });
 
 // this was a planed in order to launch a media player. can be omited or used

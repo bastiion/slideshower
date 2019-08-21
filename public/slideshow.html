@@ -37,6 +37,7 @@
   <video class="media-element" autoplay muted id="videoSlide" src="" alt=""></video>
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
+<script src="/robust-websocket/robust-websocket.js"></script>
 <script src="/vanilla-fade/dist/vanilla-fade.js"></script>
 <script src="/public/client.js"></script>
 <script>
@@ -148,8 +149,9 @@
     videoSlideElement[0].pause();
     const mediaPath = uploadPath + mediaFile.fileName;
     const isImage = mediaFile.mimeType.indexOf("image/") === 0;
-    const isVideo = mediaFile.mimeType.indexOf("video/") === 0;
-    if (!isImage && !isVideo) return;
+    const isVideo = mediaFile.mimeType.indexOf("video/") === 0 || mediaFile.mimeType.indexOf("audio/") === 0;
+    if (!isImage && !isVideo)
+      return;
 
     slideshowElement[0].fadeOut(duration = 250, easing = 'linear', complete = () => {
       if (isVideo) {
