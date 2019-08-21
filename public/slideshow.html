@@ -33,12 +33,13 @@
 </head>
 <body>
 <div class="slideshow">
-  <img class="media-element" id="imgSlide" src="" alt="">
-  <video class="media-element" autoplay muted id="videoSlide" src="" alt=""></video>
+  <img class="media-element image" id="imgSlide" src="" alt="">
+  <video class="media-element video" autoplay muted id="videoSlide" src="" alt=""></video>
 </div>
 <script src="/jquery/dist/jquery.min.js"></script>
 <script src="/robust-websocket/robust-websocket.js"></script>
 <script src="/vanilla-fade/dist/vanilla-fade.js"></script>
+<script src="/imagesloaded/imagesloaded.pkgd.min.js"></script>
 <script src="/public/client.js"></script>
 <script>
   let playlist = [];
@@ -68,7 +69,6 @@
 
   });
   const slideshowElement = $(".slideshow");
-  const imgSlideELement = $("#imgSlide");
   const videoSlideElement = $("#videoSlide");
   videoSlideElement.on('pause', () => {
     updateSlideshowSession()
@@ -153,21 +153,36 @@
     if (!isImage && !isVideo)
       return;
 
-    slideshowElement[0].fadeOut(duration = 250, easing = 'linear', complete = () => {
-      if (isVideo) {
-        slideshowElement.attr('data-video-is-active', true);
-        videoSlideElement.attr('src', mediaPath);
-      } else {
-        slideshowElement.attr('data-video-is-active', null);
-        imgSlideELement.attr('src', mediaPath);
-        if(!paused) {
-          timer = window.setTimeout(nextSlide, mediaFile.duration * 1000 + 200);
+    const imgSlideElement = $(".media-element.image");
+    let newImgSlideElement;
+    if (!isVideo) {
+      newImgSlideElement = $(`<img class="media-element image" src="${mediaPath}" alt="${mediaFile}">`)
+
+      newImgSlideElement.imagesLoaded()
+          .always(() => {
+            transitionToNewMedia();
+          });
+    } else {
+      transitionToNewMedia();
+    }
+    function transitionToNewMedia() {
+      slideshowElement[0].fadeOut(duration = 250, easing = 'linear', complete = () => {
+        if (isVideo) {
+          slideshowElement.attr('data-video-is-active', true);
+          videoSlideElement.attr('src', mediaPath);
+        } else {
+          slideshowElement.attr('data-video-is-active', null);
+          //imgSlideElement.attr('src', mediaPath);
+          imgSlideElement.replaceWith(newImgSlideElement);
+          if (!paused) {
+            timer = window.setTimeout(() => nextSlide(), mediaFile.duration * 1000 + 200);
+          }
         }
-      }
-      setTimeout(() => {
-        slideshowElement[0].fadeIn(duration = 250, easing = 'linear', complete = null)
-      }, 200);
-    });
+        setTimeout(() => {
+          slideshowElement[0].fadeIn(duration = 250, easing = 'linear', complete = null)
+        }, 20);
+      });
+    }
 
   }
 

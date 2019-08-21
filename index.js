@@ -9,6 +9,7 @@ const spawn = require('child_process').spawn;
 const WebSocket = require("ws");
 const mongoose = require('mongoose');
 const mime = require('mime-types');
+const errorhandler = require('errorhandler');
 const _ = require('lodash');
 
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
@@ -26,8 +27,9 @@ const cookieParserInstance = cookieParser(SECRET)
 app.use(express.static("node_modules"));
 app.use(UPLOAD_RELATIVE_URI, express.static(UPLOAD_DIR));
 app.use('/public', express.static("public"));
-app.use(bodyParser.json());
-app.use(cookieParserInstance);
+app.use(bodyParser.json());                     //we need this because we want to parse json from post requests
+app.use(cookieParserInstance);                  //if we want to havea clew about the user session on a websocket
+app.use(errorhandler());                //without this all errors will halt the node.js process
 app.set('json spaces', 4);
 
 const server = app.listen(3000, () => {
@@ -313,7 +315,13 @@ const storage = multer.diskStorage({
 });
 
 // will return a new Multer instance that can be used like a function
-const upload = multer({storage: storage}).array('userFile', 10);
+const upload = multer({
+  storage: storage,
+  onError: function (err, next) {
+    console.error('error uploading files', err);
+    next(err);
+  }
+}).array('userFile', 20);
 
 //serve the index page
 app.get('/', (req, res) => {
@@ -380,7 +388,7 @@ app.delete('/api/files/:fileName', (req, res, next) => {
     if (err) throw new Error("Cannot delete file out of playlist", err);
   });
   fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
-    if (err) throw new Error("Cannot remove file from disk", err);
+    if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
     res.sendStatus(204);
   });
 });
