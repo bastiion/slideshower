@@ -329,7 +329,7 @@ app.get('/', (req, res) => {
 });
 
 //the upload form post request
-app.post('/api/photo', upload, (req, res) => {
+app.post('/api/photo', upload, (req, res, next) => new Promise( resolve =>  {
   console.log(req.files);
   res.end("File has been uploaded");
   if (!Array.isArray(req.files)) return;
@@ -343,31 +343,36 @@ app.post('/api/photo', upload, (req, res) => {
   });
   MediaElement.create(newMediaElements, (err, newElements) => {
     if (err) {
-      console.error("cannot create new MediaElement in DB", err);
-      return;
+      throw new Error("cannot create new MediaElement in DB", err);
     }
     sendPlaylist(wsm.wsAll());
     sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
+    resolve();
   });
-});
+}).catch(next)
+);
 
-app.delete('/api/playlist', (req, res) => {
+app.delete('/api/playlist', (req, res, next) => new Promise( resolve => {
   MediaElement.deleteMany({}, (err) => {
     if (err) throw new Error("Cannot delete playlist", err);
     sendPlaylist(wsm.wsAll());
     res.sendStatus(204);
+    resolve();
   });
-});
+}).catch(next)
+);
 
-app.delete('/api/playlist/:id', (req, res) => {
+app.delete('/api/playlist/:id', (req, res, next) => new Promise( resolve => {
   MediaElement.findByIdAndDelete(req.params.id, (err) => {
     if (err) throw new Error("Cannot delete file out of playlist", err);
     sendPlaylist(wsm.wsAll());
     res.sendStatus(204);
+    resolve();
   });
-});
+}).catch(next)
+);
 
-app.post('/api/playlist/:id', (req, res, next) => {
+app.post('/api/playlist/:id', (req, res, next) => new Promise( resolve => {
   const duration = parseInt(req.body.duration);
   if (isNaN(duration)) {
     throw new Error("duration is not a number");
@@ -378,23 +383,27 @@ app.post('/api/playlist/:id', (req, res, next) => {
     mediaFile.duration = duration;
     mediaFile.save();
     res.sendStatus(204);
-  })
-});
+    resolve();
+  });
+}).catch(next)
+);
 
 
-app.delete('/api/files/:fileName', (req, res, next) => {
+app.delete('/api/files/:fileName', (req, res, next) => new Promise( resolve => {
   let fileName = req.params.fileName;
   MediaElement.deleteOne({fileName: fileName}, (err) => {
     if (err) throw new Error("Cannot delete file out of playlist", err);
+    fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
+      if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
+      res.sendStatus(204);
+      resolve();
+    });
   });
-  fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
-    if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
-    res.sendStatus(204);
-  });
-});
+}).catch(next)
+);
 
-app.post('/api/playlist', (req, res, next) => {
-  Promise.all(req.body.playlist.map(item =>
+app.post('/api/playlist', (req, res, next) =>
+  Promise.all(req.body.playlist.map( item =>
       MediaElement.findById(item._id).exec().then(
           (mediaFile) => {
             const orderIndex = parseInt(item.oderIndex);
@@ -407,10 +416,10 @@ app.post('/api/playlist', (req, res, next) => {
         sendPlaylist(wsm.wsAll());
         res.sendStatus(204);
       })
-      .catch(next);
-});
+      .catch(next)
+);
 
-app.put('/api/playlist/recreate', (req, res) => {
+app.put('/api/playlist/recreate', (req, res, next) => new Promise( resolve => {
   fs.readdir(UPLOAD_DIR, (err, listing) => {
     if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
     for (let fileName of listing) {
@@ -421,7 +430,8 @@ app.put('/api/playlist/recreate', (req, res) => {
     }
     res.sendStatus(204);
   })
-});
+}).catch(next)
+);
 
 app.get('/api/session', (req, res, next) => {
   SlideshowSession.find({slideshow: {$exists: true}}).sort({'sessionID': 'asc'}).exec()
