@@ -1,11 +1,15 @@
 <html>
 <head>
   <title>File upload Node.</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/semantic-ui/dist/components/reset.css">
   <link rel="stylesheet" href="/semantic-ui/dist/semantic.css">
   <style>
-    .preview {
-      width: 50px;
+    .grabbable {
+      cursor: move; /* fallback if grab cursor is unsupported */
+      cursor: grab;
+      cursor: -moz-grab;
+      cursor: -webkit-grab;
     }
   </style>
 </head>
@@ -36,12 +40,12 @@
 </div>
 <div class="ui text container sortable-content">
   <h1 class="ui dividing header">Playlist erstellen</h1>
-  <div id="wrap" class="ui list items">
+  <div id="wrap" class="ui list relaxed items">
   </div>
 </div>
 <div class="ui basic modal" id="confirmDeleteModal">
   <div class="ui icon header">
-    <i class="archive icon"></i>
+    <i class="trash icon"></i>
     <span class="modal-title">Medien Element entfernen?</span>
   </div>
   <div class="content">
@@ -108,17 +112,23 @@
         const mediaElement = isImage ? `<img src='${mediaPath}'>` : `<video class="image" muted src='${mediaPath}'></video>`;
 
         wrapElement.append(`
-  <div class="ui item media-element-item" data-media-element-id="${mediaFile._id}" data-media-element-file-name="${mediaFile.fileName}">
-    <div class="ui tiny images">
+  <div class="item media-element-item" data-media-element-id="${mediaFile._id}" data-media-element-file-name="${mediaFile.fileName}">
+    <div class="ui tiny image images grabbable">
     ${mediaElement}
     </div>
     <div class="middle aligned content">
-      ${mediaFile.fileName} <br>
-      Dauer in Sekunden<input type="number" name="duration" class="duration-change-input" value="${mediaFile.duration}">
-      <div class="ui vertical animated button delete-media-btn" tabindex="0">
-        <div class="hidden content">delete</div>
-        <div class="visible content">
-          <i class="trash icon"></i>
+      <div class="header">
+        ${mediaFile.fileName}
+      </div>
+      <div class="meta">
+        Dauer in Sekunden<input type="number" name="duration" class="duration-change-input" value="${mediaFile.duration}">
+      </div>
+      <div class="meta">
+        <div class="ui right floated basic button delete-media-btn" tabindex="0">
+          <div class="hidden content">delete</div>
+          <div class="visible content">
+            <i class="trash icon"></i>
+          </div>
         </div>
       </div>
     </div>
@@ -128,6 +138,7 @@
       }
       $(".delete-media-btn", wrapElement).on('click', showDeleteMediaElementConfirmModal);
       wrapElement.sortable({
+        handle: ".grabbable",
         onUpdate: event => {
           const playlistChangedOrder = [];
           $(event.to).children('.media-element-item').each((i, item) => {
@@ -155,7 +166,7 @@
       status.empty().text("File is uploading...");
       $(this).ajaxSubmit({
         error: function (xhr) {
-          status.empty().text('Error: ' + xhr.status);
+          status.empty().text('Error: ' + xhr.status + ' ' + xhr.message);
         },
         success: function (response) {
           console.log(response);
