@@ -379,13 +379,26 @@ app.post('/api/playlist/:id', (req, res, next) => new Promise( resolve => {
   }
 
   MediaElement.findById(req.params.id).exec((err, mediaFile) => {
-    if (err) throw new Error("Cannot find file  inplaylist", err);
+    if (err) throw new Error("Cannot find file inplaylist", err);
     mediaFile.duration = duration;
     mediaFile.save();
     res.sendStatus(204);
     resolve();
   });
 }).catch(next)
+);
+
+app.put('/api/clone/playlist/:id', (req, res, next) => {
+  const mediaElementID = req.params.id;
+  MediaElement.findById(mediaElementID).exec().then((newMediaElement) => {
+    newMediaElement._id = mongoose.Types.ObjectId();
+    newMediaElement.isNew = true;
+    return newMediaElement.save()
+  }).then(() => {
+    sendPlaylist(wsm.wsAll());
+    res.sendStatus(204);
+  }).catch(next)
+}
 );
 
 

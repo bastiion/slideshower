@@ -22,6 +22,13 @@ function deleteFile(fileName) {
   return fetch(baseAddr + "/api/files/" + fileName, {method: 'DELETE'});
 }
 
+function cloneMediaElement(id) {
+  return fetch(baseAddr + "/api/clone/playlist/" + id, {method: 'PUT'});
+}
+function removeMediaElementFromPlaylist(id) {
+  return fetch(baseAddr + "/api/playlist/" + id, {method: 'DELETE'});
+}
+
 function updatePlaylistOrder(playlist) {
   return _postData(baseAddr + "/api/playlist", {
     playlist: playlist

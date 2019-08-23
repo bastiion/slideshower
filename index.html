@@ -43,6 +43,25 @@
   <div id="wrap" class="ui list relaxed items">
   </div>
 </div>
+<div class="ui basic modal" id="confirmRemoveModal">
+  <div class="ui icon header">
+    <i class="archive icon"></i>
+    <span class="modal-title">Medien Element aus Playlist?</span>
+  </div>
+  <div class="content">
+    <p>Dies wird aus der Playlists entfernt.</p>
+  </div>
+  <div class="actions">
+    <div class="ui red basic cancel inverted button">
+      <i class="remove icon"></i>
+      Nein
+    </div>
+    <div class="ui green ok inverted button confirm-media-element-remove-btn">
+      <i class="checkmark icon"></i>
+      Ja
+    </div>
+  </div>
+</div>
 <div class="ui basic modal" id="confirmDeleteModal">
   <div class="ui icon header">
     <i class="trash icon"></i>
@@ -96,6 +115,21 @@
         currentMediaElementItemJQ.remove();
       });
     });
+    function showRemoveMediaElementConfirmModal(event) {
+      const dialog = $("#confirmRemoveModal");
+      currentMediaElementItemJQ = $(event.target).closest('.media-element-item');
+      $(".modal-title", dialog).text(`${currentMediaElementItemJQ.attr('data-media-element-file-name')} aus Playlist entfernen?`);
+      dialog.modal('show');
+    }
+
+    $(".confirm-media-element-remove-btn").on('click', (event) => {
+      const mediaElementID = currentMediaElementItemJQ.attr('data-media-element-id');
+      if(typeof mediaElementID === 'string' && mediaElementID.length > 0) {
+        removeMediaElementFromPlaylist(mediaElementID).then(() => {
+          currentMediaElementItemJQ.remove();
+        });
+      }
+    });
     $(document).on("playlist-updated", (event) => {
       const playl = event.detail.playlist;
       if (!Array.isArray(playl)) return;
@@ -124,6 +158,18 @@
         Dauer in Sekunden<input type="number" name="duration" class="duration-change-input" value="${mediaFile.duration}">
       </div>
       <div class="meta">
+        <div class="ui right floated basic button clone-media-btn" tabindex="0">
+          <div class="hidden content">clone</div>
+          <div class="visible content">
+            <i class="clone icon"></i>
+          </div>
+        </div>
+        <div class="ui right floated basic button remove-media-btn" tabindex="0">
+          <div class="hidden content">remove</div>
+          <div class="visible content">
+            <i class="archive icon"></i>
+          </div>
+        </div>
         <div class="ui right floated basic button delete-media-btn" tabindex="0">
           <div class="hidden content">delete</div>
           <div class="visible content">
@@ -136,6 +182,13 @@
 `
         )
       }
+      $(".clone-media-btn", wrapElement).on('click', (event) => {
+        const mediaElementID = $(event.target).closest('.media-element-item').attr('data-media-element-id');
+        if(typeof mediaElementID === 'string' && mediaElementID.length > 0) {
+          cloneMediaElement(mediaElementID);
+        }
+      });
+      $(".remove-media-btn", wrapElement).on('click', showRemoveMediaElementConfirmModal);
       $(".delete-media-btn", wrapElement).on('click', showDeleteMediaElementConfirmModal);
       wrapElement.sortable({
         handle: ".grabbable",
