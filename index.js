@@ -259,6 +259,9 @@ wss.on('connection', (ws, req) => {
             })
           });
           break;
+        case "forceReloadPage":
+          wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "forceReloadPage"});
+          break;
         case "setPlayerVolume":
           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "updatePlayerVolume", data: msg.data.playerVolume});
           break;

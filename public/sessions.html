@@ -44,6 +44,10 @@
         const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
         sendCommand("setPlayerVolume", {slideshowID: slideshowID, playerVolume: newVolume});
       });
+      $(".reload-page-btn", parent).on('click', event => {
+        const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
+        sendCommand("forceReloadPage", {slideshowID: slideshowID});
+      });
       $(".next-slide-btn", parent).on('click', event => {
         const slideshowID = $(event.target).closest('.media-element-item').attr('data-slideshow-id');
         sendCommand("nextSlideWish", {slideshowID: slideshowID});
@@ -135,6 +139,12 @@
         <div class="hidden content">next</div>
         <div class="visible content">
           <i class="chevron right icon"></i>
+        </div>
+      </div>
+      <div class="ui vertical animated button reload-page-btn" tabindex="2">
+        <div class="hidden content">reload page</div>
+        <div class="visible content">
+          <i class="redo icon"></i>
         </div>
       </div>
       <div class="video-control">

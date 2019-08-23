@@ -141,6 +141,9 @@ emitResult(getPlaylist, "playlist-updated", "playlist")
                   new CustomEvent("images-updated", {detail: {images: msg.data}})
               );
               break;
+            case "forceReloadPage":
+              window.location.reload();
+              break;
             default:
           }
         } catch (e) {
