@@ -181,6 +181,9 @@
         if (isVideo) {
           slideshowElement.attr('data-video-is-active', true);
           videoSlideElement.attr('src', mediaPath);
+          if (!paused) {
+            timer = window.setTimeout(() => nextSlide(), mediaFile.duration * 1000 + 200);
+          }
         } else {
           slideshowElement.attr('data-video-is-active', null);
           //imgSlideElement.attr('src', mediaPath);
