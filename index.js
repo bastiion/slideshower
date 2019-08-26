@@ -54,6 +54,23 @@ app.use(session({
   autoRemove: 'native'
 }));
 
+const ClientErrorSchema = new mongoose.Schema({
+  sessionID: String,
+  message: String,
+  commit: String,
+  wsClientID: {
+    type: String,
+    required: false
+  },
+  error: {
+    type: Object,
+    required: false
+  },
+  data: {type: Date, default: Date.now}
+});
+
+const ClientError = mongoose.model('ClientError', ClientErrorSchema);
+
 const MediaElementSchema = new mongoose.Schema({
   fileName: String,
   duration: Number,
@@ -80,6 +97,38 @@ const SlideshowSessionSchema = new mongoose.Schema({
   }
 });
 const SlideshowSession = mongoose.model('SlieshowSession', SlideshowSessionSchema);
+
+const CommitLogSchema = new mongoose.Schema(
+    {
+      "commit": {type: String},
+      "abbreviated_commit": {type: String},
+      "tree": {type: String},
+      "abbreviated_tree": {type: String},
+      "parent": {type: String},
+      "abbreviated_parent": {type: String},
+      "refs": {type: String},
+      "encoding": {type: String, required: false},
+      "subject": {type: String},
+      "sanitized_subject_line": {type: String},
+      "body": {type: String, required: false},
+      "commit_notes": {type: String, required: false},
+      "verification_flag": {type: String},
+      "signer": {type: String, required: false},
+      "signer_key": {type: String, required: false},
+      "author": {
+        "name": {type: String},
+        "email": {type: String},
+        "date": {type: String}
+      },
+      "commiter": {
+        "name": {type: String},
+        "email": {type: String},
+        "date": {type: String}
+      }
+    }
+);
+
+const CommitLog = mongoose.model("CommitLog", CommitLogSchema);
 
 SlideshowSession.deleteMany({}, (err) => {
   if (err) console.error("Cannot clear slideshow sessions on startup", err);
@@ -134,7 +183,23 @@ function sendPlaylist(wsArr) {
 function sendSlideshowSessions(wsArr) {
   SlideshowSession.find({slideshow: {$exists: true}}).sort({'sessionID': 'asc'}).exec().then(sessions => {
     sendDataToWS(wsArr, {command: "slideshowSessions", data: sessions});
+  }).catch(err => {
+    console.error("cannot list slideshow sessions", err)
   });
+}
+
+function createClientError(data) {
+  const {message, error, sessionID, wsClientID, commit} = data;
+  const clientErrorObject = {
+    message: message,
+    commit: commit,
+    error: error,
+    wsClientID: wsClientID,
+    sessionID: sessionID
+  };
+  console.log(JSON.stringify(clientErrorObject, null, 2));
+  const clientError = new ClientError(clientErrorObject);
+  return clientError.save(clientErrorObject);
 }
 
 // Websocket connection setup
@@ -167,6 +232,14 @@ class WebsocketClientMap {
     const index = this.wsAllMap.findIndex(item => item.ws === ws);
     if (index >= 0) {
       return this.wsAllMap[index].slideshowSessionID;
+    }
+    return null;
+  }
+
+  sessionIDByWS(ws) {
+    const index = this.wsAllMap.findIndex(item => item.ws === ws);
+    if (index >= 0) {
+      return this.wsAllMap[index].sessionID;
     }
     return null;
   }
@@ -286,7 +359,16 @@ wss.on('connection', (ws, req) => {
         case "slideshowPlayWish":
           wsm.sendBySlideSessionID(msg.data.slideshowID, {command: "slideshowPlayWish"});
           break;
-        default:
+        case "clientError":
+          const clientID = wsm.slideSessionIDByWS(ws);
+          const sessionID = wsm.sessionIDByWS(ws);
+          createClientError({
+            ...msg.data,
+            wsClientID: clientID,
+            sessionID: sessionID
+          });
+          break;
+        default: //simply ignore other messages
       }
 
     } catch (e) {
@@ -331,122 +413,135 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
+app.post('/api/error', (req, res, next) =>
+    createClientError({
+      ...req.body,
+      sessionID: req.signedCookies['connect.sid']
+    })
+        .then(() => res.sendStatus(204))
+        .catch(next)
+);
+app.get('/api/error', (req, res, next) =>
+    ClientError.find({}).sort({'date': 'asc'}).exec()
+        .then(clientErrors => res.json(clientErrors))
+        .catch(next)
+);
+
 //the upload form post request
-app.post('/api/photo', upload, (req, res, next) => new Promise( resolve =>  {
-  console.log(req.files);
-  res.end("File has been uploaded");
-  if (!Array.isArray(req.files)) return;
-  let duration = parseInt(req.body.duration);
-  if (!duration) {
-    duration = DEFAULT_DURATION
-  }
-  const newMediaElements = req.files.map(file => {
-    const mimeType = mime.lookup(file.path);
-    return {fileName: file.filename, mimeType: mimeType, duration: duration}
-  });
-  MediaElement.create(newMediaElements, (err, newElements) => {
-    if (err) {
-      throw new Error("cannot create new MediaElement in DB", err);
-    }
-    sendPlaylist(wsm.wsAll());
-    sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
-    resolve();
-  });
-}).catch(next)
+app.post('/api/photo', upload, (req, res, next) => new Promise(resolve => {
+      console.log(req.files);
+      res.end("File has been uploaded");
+      if (!Array.isArray(req.files)) return;
+      let duration = parseInt(req.body.duration);
+      if (!duration) {
+        duration = DEFAULT_DURATION
+      }
+      const newMediaElements = req.files.map(file => {
+        const mimeType = mime.lookup(file.path);
+        return {fileName: file.filename, mimeType: mimeType, duration: duration}
+      });
+      MediaElement.create(newMediaElements, (err, newElements) => {
+        if (err) {
+          throw new Error("cannot create new MediaElement in DB", err);
+        }
+        sendPlaylist(wsm.wsAll());
+        sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
+        resolve();
+      });
+    }).catch(next)
 );
 
-app.delete('/api/playlist', (req, res, next) => new Promise( resolve => {
-  MediaElement.deleteMany({}, (err) => {
-    if (err) throw new Error("Cannot delete playlist", err);
-    sendPlaylist(wsm.wsAll());
-    res.sendStatus(204);
-    resolve();
-  });
-}).catch(next)
+app.delete('/api/playlist', (req, res, next) => new Promise(resolve => {
+      MediaElement.deleteMany({}, (err) => {
+        if (err) throw new Error("Cannot delete playlist", err);
+        sendPlaylist(wsm.wsAll());
+        res.sendStatus(204);
+        resolve();
+      });
+    }).catch(next)
 );
 
-app.delete('/api/playlist/:id', (req, res, next) => new Promise( resolve => {
-  MediaElement.findByIdAndDelete(req.params.id, (err) => {
-    if (err) throw new Error("Cannot delete file out of playlist", err);
-    sendPlaylist(wsm.wsAll());
-    res.sendStatus(204);
-    resolve();
-  });
-}).catch(next)
+app.delete('/api/playlist/:id', (req, res, next) => new Promise(resolve => {
+      MediaElement.findByIdAndDelete(req.params.id, (err) => {
+        if (err) throw new Error("Cannot delete file out of playlist", err);
+        sendPlaylist(wsm.wsAll());
+        res.sendStatus(204);
+        resolve();
+      });
+    }).catch(next)
 );
 
-app.post('/api/playlist/:id', (req, res, next) => new Promise( resolve => {
-  const duration = parseInt(req.body.duration);
-  if (isNaN(duration)) {
-    throw new Error("duration is not a number");
-  }
+app.post('/api/playlist/:id', (req, res, next) => new Promise(resolve => {
+      const duration = parseInt(req.body.duration);
+      if (isNaN(duration)) {
+        throw new Error("duration is not a number");
+      }
 
-  MediaElement.findById(req.params.id).exec((err, mediaFile) => {
-    if (err) throw new Error("Cannot find file inplaylist", err);
-    mediaFile.duration = duration;
-    mediaFile.save();
-    res.sendStatus(204);
-    resolve();
-  });
-}).catch(next)
+      return MediaElement.findById(req.params.id).exec().then((mediaFile) => {
+        mediaFile.duration = duration;
+        mediaFile.save();
+        res.sendStatus(204);
+        resolve();
+      }).catch(next);
+    }).catch(next)
 );
 
 app.put('/api/clone/playlist/:id', (req, res, next) => {
-  const mediaElementID = req.params.id;
-  MediaElement.findById(mediaElementID).exec().then((newMediaElement) => {
-    newMediaElement._id = mongoose.Types.ObjectId();
-    newMediaElement.isNew = true;
-    return newMediaElement.save()
-  }).then(() => {
-    sendPlaylist(wsm.wsAll());
-    res.sendStatus(204);
-  }).catch(next)
-}
+      const mediaElementID = req.params.id;
+      MediaElement.findById(mediaElementID).exec().then((newMediaElement) => {
+        newMediaElement._id = mongoose.Types.ObjectId();
+        newMediaElement.isNew = true;
+        return newMediaElement.save()
+      }).then(() => {
+        sendPlaylist(wsm.wsAll());
+        res.sendStatus(204);
+      }).catch(next)
+    }
 );
 
 
-app.delete('/api/files/:fileName', (req, res, next) => new Promise( resolve => {
-  let fileName = req.params.fileName;
-  MediaElement.deleteOne({fileName: fileName}, (err) => {
-    if (err) throw new Error("Cannot delete file out of playlist", err);
-    fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
-      if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
-      res.sendStatus(204);
-      resolve();
-    });
-  });
-}).catch(next)
+app.delete('/api/files/:fileName', (req, res, next) => new Promise(resolve => {
+      let fileName = req.params.fileName;
+      MediaElement.deleteOne({fileName: fileName}, (err) => {
+        if (err) throw new Error("Cannot delete file out of playlist", err);
+        fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
+          if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
+          res.sendStatus(204);
+          resolve();
+        });
+      });
+    }).catch(next)
 );
 
 app.post('/api/playlist', (req, res, next) =>
-  Promise.all(req.body.playlist.map( item =>
-      MediaElement.findById(item._id).exec().then(
-          (mediaFile) => {
-            const orderIndex = parseInt(item.oderIndex);
-            if (!isNaN(orderIndex)) throw new Error("orderIndex is not a number");
-            mediaFile.orderIndex = item.orderIndex;
-            return mediaFile.save()
-          })
-  ))
-      .then(() => {
-        sendPlaylist(wsm.wsAll());
-        res.sendStatus(204);
-      })
-      .catch(next)
+    Promise.all(req.body.playlist.map(item =>
+        MediaElement.findById(item._id).exec().then(
+            (mediaFile) => {
+              const orderIndex = parseInt(item.oderIndex);
+              if (!isNaN(orderIndex)) throw new Error("orderIndex is not a number");
+              mediaFile.orderIndex = item.orderIndex;
+              return mediaFile.save()
+            })
+    ))
+        .then(() => {
+          sendPlaylist(wsm.wsAll());
+          res.sendStatus(204);
+        })
+        .catch(next)
 );
 
-app.put('/api/playlist/recreate', (req, res, next) => new Promise( resolve => {
-  fs.readdir(UPLOAD_DIR, (err, listing) => {
-    if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
-    for (let fileName of listing) {
-      const filePath = `${UPLOAD_DIR}/${fileName}`;
-      const mimeType = mime.lookup(filePath);
-      const mediaElement = new MediaElement({fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
-      mediaElement.save();
-    }
-    res.sendStatus(204);
-  })
-}).catch(next)
+app.put('/api/playlist/recreate', (req, res, next) => new Promise(resolve => {
+      fs.readdir(UPLOAD_DIR, (err, listing) => {
+        if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
+        for (let fileName of listing) {
+          const filePath = `${UPLOAD_DIR}/${fileName}`;
+          const mimeType = mime.lookup(filePath);
+          const mediaElement = new MediaElement({fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
+          mediaElement.save();
+        }
+        res.sendStatus(204);
+      })
+    }).catch(next)
 );
 
 app.get('/api/session', (req, res, next) => {
@@ -464,6 +559,72 @@ app.get('/api/playlist', (req, res, next) => {
 // this was a planed in order to launch a media player. can be omited or used
 // as a reference how to start sub processes directly out of node js
 let mpvChild;
+
+
+app.get('/public/sha.js', (req, res, next) => {
+  gitLogRevHead().then(sha => {
+    if(sha.length > 1) {
+      sha = sha.trimEnd();
+    }
+    res.end(`function currentSha() { return "${sha}"; }`);
+  }).catch(next);
+});
+
+app.get('/git/log/all', (req, res, next) =>
+  CommitLog.find({}).sort({"comitter.data": 'asc'}).then(logEntries => {
+    res.json(logEntries);
+  }).catch(next)
+);
+app.put('/git/log/all', (req, res, next) =>
+  executeProcess('git', ['log', '--pretty=format:{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "verification_flag": "%G?",%n  "signer": "%GS",%n  "signer_key": "%GK",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},'])
+      .then(data => {
+        let logEntries = [];
+        if(data.length > 2) {
+          data =  "[ " + data.substr(0, data.length - 1) + " ]".replace(/\n/, '', 'g');
+        }
+        try {
+          logEntries = JSON.parse(data);
+        } catch (e) {
+          throw new Error("Cannot parse log string " + data, e);
+        }
+        return Promise.all(logEntries.map(entry =>
+                CommitLog.findOneAndUpdate({commit: entry.commit}, entry, {upsert: true} ).exec()
+            ))
+            .then(() => {
+              res.sendStatus(204);
+            })
+        }).catch(next)
+);
+
+function executeProcess(command, params) {
+  return new Promise((resolve, reject) => {
+
+    const gitProcess = spawn(command, params);
+    let logString = "";
+    let error = null;
+    gitProcess.stdout.on('data', (data) => {
+      //console.log(`stdout: ${data}`);
+        logString += data.toString();
+    });
+
+    gitProcess.stderr.on('data', (data) => {
+      console.error(`stderr: ${data}`);
+      error = data;
+    });
+    gitProcess.on('close', (code) => {
+      console.log(`child process exited with code ${code}`);
+      if (error) {
+        reject(new Error("Process failed", error));
+      }
+      resolve(logString);
+    });
+  })
+}
+
+function gitLogRevHead() {
+  return  executeProcess('git', [ 'rev-parse', 'HEAD']);
+
+}
 
 app.get('/api/play', (req, res) => {
   //fs.readFile("")
