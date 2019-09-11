@@ -621,7 +621,7 @@ function executeProcess(command, params) {
 
     const gitProcess = spawn(command, params);
     let logString = "";
-    let error = null;
+    let error = "";
     gitProcess.stdout.on('data', (data) => {
       //console.log(`stdout: ${data}`);
         logString += data.toString();
@@ -629,9 +629,9 @@ function executeProcess(command, params) {
 
     gitProcess.stderr.on('data', (data) => {
       console.error(`stderr: ${data}`);
-      error = data;
+      error += data;
     });
-    gitProcess.on('close', (code) => {
+    gitProcess.on('exit', (code) => {
       console.log(`child process exited with code ${code}`);
       if(code === 0) {
         resolve(logString);
@@ -647,7 +647,6 @@ function gitLogRevHead() {
 
 }
 
-let playerProcessLaunched = false;
 
 app.get('/api/shutdown/', (req, res, next) => {
   executeProcess('sudo', ['shutdown', '+0']).then(() => {
@@ -667,6 +666,7 @@ app.get('/api/browser/restart', (req, res, next) => {
   }).catch(next)
 });
 
+let playerProcessLaunched = false;
 app.put('/api/play/:id', (req, res, next) => {
   //fs.readFile("")
   if(playerProcessLaunched) {
@@ -678,6 +678,9 @@ app.put('/api/play/:id', (req, res, next) => {
   MediaElement.findById(id).exec().then( (mediaElement) => {
     res.sendStatus(204);
     playerProcessLaunched = true;
+    //TODO fixme:
+    setTimeout(() => playerProcessLaunched = false, 1000*60*2);
+
     return executeProcess('/usr/bin/omxplayer', [ `file://${UPLOAD_DIR}/${mediaElement.fileName}`] ).finally(() => {
       playerProcessLaunched = false;
       if(sessionID) {
