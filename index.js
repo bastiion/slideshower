@@ -18,15 +18,15 @@ const UPLOAD_RELATIVE_URI = "/uploads";
 const MONGO_DB = "mongodb://localhost/test";
 const DEFAULT_DURATION = 5;
 
-String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function() {
-	if(String.prototype.trimRight) {
-		return this.trimRight();
-	} else if(String.prototype.trim) {
-		var trimmed = this.trim();
-		var indexOfWord = this.indexOf(trimmed);
+String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function () {
+  if (String.prototype.trimRight) {
+    return this.trimRight();
+  } else if (String.prototype.trim) {
+    var trimmed = this.trim();
+    var indexOfWord = this.indexOf(trimmed);
 
-		return this.slice(indexOfWord, this.length);
-	}
+    return this.slice(indexOfWord, this.length);
+  }
 };
 
 
@@ -583,7 +583,7 @@ let mpvChild;
 
 app.get('/public/sha.js', (req, res, next) => {
   gitLogRevHead().then(sha => {
-    if(sha.length > 1) {
+    if (sha.length > 1) {
       sha = sha.trimEnd();
     }
     res.end(`function currentSha() { return "${sha}"; }`);
@@ -591,28 +591,28 @@ app.get('/public/sha.js', (req, res, next) => {
 });
 
 app.get('/git/log/all', (req, res, next) =>
-  CommitLog.find({}).sort({"comitter.data": 'asc'}).then(logEntries => {
-    res.json(logEntries);
-  }).catch(next)
+    CommitLog.find({}).sort({"comitter.data": 'asc'}).then(logEntries => {
+      res.json(logEntries);
+    }).catch(next)
 );
 app.put('/git/log/all', (req, res, next) =>
-  executeProcess('git', ['log', '--pretty=format:{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "verification_flag": "%G?",%n  "signer": "%GS",%n  "signer_key": "%GK",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},'])
-      .then(data => {
-        let logEntries = [];
-        if(data.length > 2) {
-          data =  "[ " + data.substr(0, data.length - 1) + " ]".replace(/\n/, '', 'g');
-        }
-        try {
-          logEntries = JSON.parse(data);
-        } catch (e) {
-          throw new Error("Cannot parse log string " + data, e);
-        }
-        return Promise.all(logEntries.map(entry =>
-                CommitLog.findOneAndUpdate({commit: entry.commit}, entry, {upsert: true} ).exec()
-            ))
-            .then(() => {
-              res.sendStatus(204);
-            })
+    executeProcess('git', ['log', '--pretty=format:{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "verification_flag": "%G?",%n  "signer": "%GS",%n  "signer_key": "%GK",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},'])
+        .then(data => {
+          let logEntries = [];
+          if (data.length > 2) {
+            data = "[ " + data.substr(0, data.length - 1) + " ]".replace(/\n/, '', 'g');
+          }
+          try {
+            logEntries = JSON.parse(data);
+          } catch (e) {
+            throw new Error("Cannot parse log string " + data, e);
+          }
+          return Promise.all(logEntries.map(entry =>
+              CommitLog.findOneAndUpdate({commit: entry.commit}, entry, {upsert: true}).exec()
+          ))
+              .then(() => {
+                res.sendStatus(204);
+              })
         }).catch(next)
 );
 
@@ -624,7 +624,7 @@ function executeProcess(command, params) {
     let error = "";
     gitProcess.stdout.on('data', (data) => {
       //console.log(`stdout: ${data}`);
-        logString += data.toString();
+      logString += data.toString();
     });
 
     gitProcess.stderr.on('data', (data) => {
@@ -633,17 +633,17 @@ function executeProcess(command, params) {
     });
     gitProcess.on('exit', (code) => {
       console.log(`child process exited with code ${code}`);
-      if(code === 0) {
+      if (code === 0) {
         resolve(logString);
       } else {
-          reject(new Error("Process exited with " + code));
+        reject(new Error("Process exited with " + code));
       }
     });
   })
 }
 
 function gitLogRevHead() {
-  return  executeProcess('git', [ 'rev-parse', 'HEAD']);
+  return executeProcess('git', ['rev-parse', 'HEAD']);
 
 }
 
@@ -669,31 +669,38 @@ app.get('/api/browser/restart', (req, res, next) => {
 let playerProcessLaunched = false;
 app.put('/api/play/:id', (req, res, next) => {
   //fs.readFile("")
-  if(playerProcessLaunched) {
+  if (playerProcessLaunched) {
     res.sendStatus(423);
     return;
   }
   const id = req.params.id;
   const sessionID = req.signedCookies['connect.sid'];
-  MediaElement.findById(id).exec().then( (mediaElement) => {
+  MediaElement.findById(id).exec().then((mediaElement) => {
     res.sendStatus(204);
     playerProcessLaunched = true;
     //TODO fixme:
-    setTimeout(() => playerProcessLaunched = false, 1000*60*2);
+    setTimeout(() => playerProcessLaunched = false, 1000 * 60 * 2);
 
-    return executeProcess('/usr/bin/omxplayer', [ `file://${UPLOAD_DIR}/${mediaElement.fileName}`] ).finally(() => {
+    function _finally() {
       playerProcessLaunched = false;
-      if(sessionID) {
+      if (sessionID) {
         const ws = wsm.wsBySessionID(sessionID);
-        if(ws) {
+        if (ws) {
           sendDataToWS(ws, {
             command: 'externalPlayFinish',
-            data: { mediaElementID: id }});
+            data: {mediaElementID: id}
+          });
         } else {
           logError(`No WebSocket found for Session ${sessionID}`);
         }
       }
-    });
+    }
+
+    return executeProcess('/usr/bin/omxplayer', [`file://${UPLOAD_DIR}/${mediaElement.fileName}`])
+        .then(() => {
+          _finally()
+        })
+        .catch(() => _finally());
   }).catch(next);
   //mpvChild = spawn('/usr/bin/mplayer', [-/*"--image-display-duration=12",*/ `${UPLOAD_DIR}/*.jpg`]);
 
