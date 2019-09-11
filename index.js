@@ -637,6 +637,12 @@ function gitLogRevHead() {
 
 let playerProcessLaunched = false;
 
+app.get('/api/shutdown/', (req, res, next) => {
+  executeProcess('sudo', ['shutdown', '10']).then(() => {
+    res.send(204);
+  }).catch(next)
+});
+
 app.put('/api/play/:id', (req, res, next) => {
   //fs.readFile("")
   if(playerProcessLaunched) {
