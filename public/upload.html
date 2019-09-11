@@ -1,0 +1,89 @@
+<html>
+<head>
+  <title>File upload Node.</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/semantic-ui/dist/components/reset.css">
+  <link rel="stylesheet" href="/semantic-ui/dist/semantic.css">
+  <style>
+    .grabbable {
+      cursor: move; /* fallback if grab cursor is unsupported */
+      cursor: grab;
+      cursor: -moz-grab;
+      cursor: -webkit-grab;
+    }
+  </style>
+</head>
+<body>
+<div class="ui text container upload-form">
+  <h1 class="ui dividing header">1. Ein Bild oder Video hochladen</h1>
+  <form class="ui form" id="uploadForm"
+        enctype="multipart/form-data"
+        action="/api/photo"
+        method="post">
+    <div class="field">
+      <label>Bild oder Video</label>
+      <input type="file" name="userFile" multiple/>
+    </div>
+    <div class="field">
+      <label>Dauer der Darstellung in Sekunden</label>
+      <input type='number' id='duration' name='duration'><br>
+    </div>
+    <div class="field">
+      <div class="ui checkbox accept-conditions">
+        <input type="checkbox" tabindex="0" class="hidden">
+        <label>Ich akzeptiere die <a href="conditions.html">Bedingungen</a></label>
+      </div>
+    </div>
+    <button class="ui button disabled" type="submit">Medien zum Kunstwerk übermitteln</button>
+    <span id="status"></span>
+  </form>
+</div>
+
+<script src="/public/sha.js"></script>
+<script src="/jquery/dist/jquery.min.js"></script>
+<script src="/jquery-form/dist/jquery.form.min.js"></script>
+<script src="/sortablejs/Sortable.js"></script>
+<script src="/jquery-sortablejs/jquery-sortable.js"></script>
+<script src="/imagesloaded/imagesloaded.pkgd.min.js"></script>
+<script src="/semantic-ui/dist/semantic.js"></script>
+<script src="/robust-websocket/robust-websocket.js"></script>
+<script src="/public/client.js"></script>
+<script>
+
+  $(document).ready(function () {
+    let currentMediaElementItemJQ;
+    $('.ui.checkbox.accept-conditions').checkbox({
+          onChecked: function () {
+            $('button[type="submit"]').removeClass("disabled");
+          },
+          onUnchecked: function () {
+            $('button[type="submit"]').addClass("disabled");
+          }
+        }
+    );
+
+
+    $('#uploadForm').submit(function () {
+      const status = $("#status")
+      status.empty().text("File is uploading...");
+      $(this).ajaxSubmit({
+        error: function (xhr) {
+          status.empty().text('Error: ' + xhr.status + ' ' + xhr.message);
+          logError("cannot submit files", { message: xhr.message});
+        },
+        success: function (response) {
+          console.log(response);
+          status.empty().text(response);
+        }
+      });
+      return false;
+    });
+
+
+    emitResult(getPlaylist, "playlist-updated", "playlist");
+
+  });
+
+</script>
+</body>
+</html>
