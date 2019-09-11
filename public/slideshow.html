@@ -63,6 +63,7 @@
   let videoDisabled = true;
   let playingExternally = false;
 
+  let emergencyTimeoutMS = 1000*60*15;
   let emergencyTimer = null;
   resetEmergencyReloadTimer();
 
@@ -205,6 +206,7 @@
       slideshowElement[0].fadeOut(duration = 250, easing = 'linear', complete = () => {
         if (isVideo) {
           if(videoDisabled) {
+            resetEmergencyReloadTimer(1000*60);
             invokeExternalPlay(currentMediaFile._id).then((resp) => {
               if(resp.ok) {
                 playingExternally = true
@@ -218,7 +220,7 @@
               playingExternally = false;
               logError("cannot request invokeExternalPlay", err);
               nextSlide();
-            })
+            });
           } else {
             slideshowElement.attr('data-video-is-active', true);
             videoSlideElement.attr('src', mediaPath);
@@ -242,11 +244,12 @@
 
   }
 
-  function resetEmergencyReloadTimer() {
+  function resetEmergencyReloadTimer(_timeout) {
+    const timeout = _timeout ||  emergencyTimeoutMS;
     if(emergencyTimer) {
       clearTimeout(emergencyTimer);
     }
-    emergencyTimer = setTimeout(() => window.location.reload(), 1000*60*15);
+    emergencyTimer = setTimeout(() => window.location.reload(), timeout);
   }
 
   function nextSlide(addSubstractNum) {
