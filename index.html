@@ -38,21 +38,24 @@
     <span id="status"></span>
   </form>
 </div>
+
+
+<div class="ui text container">
+  <h1 class="ui dividing header">2. Den Gral Mü pflegen</h1>
+  <div class="ui three buttons">
+    <button class="ui button blue" onclick="shutdownPi()">Herunterfahren</button>
+    <button class="ui button red" onclick="rebootPi()">Neustarten</button>
+    <button class="ui button orange" onclick="restartBrowser()">Neustarten leicht</button>
+  </div>
+</div>
+
+
+
 <div class="ui text container sortable-content">
   <h1 class="ui dividing header">Playlist erstellen</h1>
   <div id="wrap" class="ui list relaxed items">
   </div>
 </div>
-
-<div class="ui text container">
-  <h1 class="ui dividing header">3. Den Gral Mü pflegen</h1>
-  <div class="ui three buttons">
-    <button class="ui active button" on-click="shutdownPi()">Herunterfahren</button>
-    <button class="ui button red" on-click="rebootPi()">Neustarten</button>
-    <button class="ui button orange" on-click="restartBrowser()">Neustarten leicht</button>
-  </div>
-</div>
-
 
 <div class="ui basic modal" id="confirmRemoveModal">
   <div class="ui icon header">

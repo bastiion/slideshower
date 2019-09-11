@@ -619,7 +619,13 @@ app.put('/git/log/all', (req, res, next) =>
 function executeProcess(command, params) {
   return new Promise((resolve, reject) => {
 
-    const gitProcess = spawn(command, params);
+    let gitProcess;
+    try {
+       gitProcess = spawn(command, params);
+    } catch (e) {
+      reject(new Error("Process cannot be started " + e));
+      return;
+    }
     let logString = "";
     let error = "";
     gitProcess.stdout.on('data', (data) => {
