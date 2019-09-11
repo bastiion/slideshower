@@ -655,6 +655,12 @@ app.get('/api/shutdown/', (req, res, next) => {
   }).catch(next)
 });
 
+app.get('/api/reboot/', (req, res, next) => {
+  executeProcess('sudo', ['shutdown', '-r', '+0']).then(() => {
+    res.sendStatus(204);
+  }).catch(next)
+});
+
 app.get('/api/browser/restart', (req, res, next) => {
   executeProcess('/usr/local/bin/startKioskBrowser.sh').then(() => {
     res.sendStatus(204);
@@ -672,7 +678,7 @@ app.put('/api/play/:id', (req, res, next) => {
   MediaElement.findById(id).exec().then( (mediaElement) => {
     res.sendStatus(204);
     playerProcessLaunched = true;
-    return executeProcess('/usr/bin/mplayer', ['-fs', `file://${UPLOAD_DIR}/${mediaElement.fileName}`] ).finally(() => {
+    return executeProcess('/usr/bin/omxplayer', [ `file://${UPLOAD_DIR}/${mediaElement.fileName}`] ).finally(() => {
       playerProcessLaunched = false;
       if(sessionID) {
         const ws = wsm.wsBySessionID(sessionID);
