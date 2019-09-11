@@ -30,6 +30,16 @@ function invokeExternalPlay(id) {
   return fetch(baseAddr + "/api/play/" + id, {method: 'PUT'});
 }
 
+function shutdownPi() {
+  return fetch(baseAddr + "/api/shutdown")
+}
+function rebootPi() {
+  return fetch(baseAddr + "/api/reboot")
+}
+function restartBrowser() {
+  return fetch(baseAddr + "/api/browser/restart")
+}
+
 function updateFile(fileId, fields) {
   return _postData(baseAddr + "/api/playlist/" + fileId, fields)
 }

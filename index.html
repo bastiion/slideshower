@@ -47,14 +47,9 @@
 <div class="ui text container">
   <h1 class="ui dividing header">3. Den Gral Mü pflegen</h1>
   <div class="ui three buttons">
-    <button class="ui active button">Herunterfahren</button>
-    <button class="ui button red">Neustarten</button>
-    <button class="ui button orange">Neustarten leicht</button>
-  </div>
-  <div class="ui three buttons">
-    <button class="ui active button">Herunterfahren</button>
-    <button class="ui button red">Neustarten</button>
-    <button class="ui button orange">Neustarten leicht</button>
+    <button class="ui active button" on-click="shutdownPi()">Herunterfahren</button>
+    <button class="ui button red" on-click="rebootPi()">Neustarten</button>
+    <button class="ui button orange" on-click="restartBrowser()">Neustarten leicht</button>
   </div>
 </div>
 
