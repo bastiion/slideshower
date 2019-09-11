@@ -18,6 +18,18 @@ const UPLOAD_RELATIVE_URI = "/uploads";
 const MONGO_DB = "mongodb://localhost/test";
 const DEFAULT_DURATION = 5;
 
+String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function() {
+	if(String.prototype.trimRight) {
+		return this.trimRight();
+	} else if(String.prototype.trim) {
+		var trimmed = this.trim();
+		var indexOfWord = this.indexOf(trimmed);
+
+		return this.slice(indexOfWord, this.length);
+	}
+};
+
+
 // setup the Server ...
 
 const app = express();
@@ -639,6 +651,12 @@ let playerProcessLaunched = false;
 
 app.get('/api/shutdown/', (req, res, next) => {
   executeProcess('sudo', ['shutdown', '+0']).then(() => {
+    res.sendStatus(204);
+  }).catch(next)
+});
+
+app.get('/api/browser/restart', (req, res, next) => {
+  executeProcess('/usr/local/bin/startKioskBrowser.sh').then(() => {
     res.sendStatus(204);
   }).catch(next)
 });
