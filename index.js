@@ -252,6 +252,14 @@ class WebsocketClientMap {
     return null;
   }
 
+  wsBySessionID(sessionID) {
+    const index = this.wsAllMap.findIndex(item => item.sessionID === sessionID);
+    if (index >= 0) {
+      return this.wsAllMap[index].ws;
+    }
+    return null;
+  }
+
   sendBySlideSessionID(slideSessionID, data) {
     if (!slideSessionID) {
       console.error("no slide session id given");
@@ -613,10 +621,11 @@ function executeProcess(command, params) {
     });
     gitProcess.on('close', (code) => {
       console.log(`child process exited with code ${code}`);
-      if (error) {
-        reject(new Error("Process failed", error));
+      if(code === 0) {
+        resolve(logString);
+      } else {
+          reject(new Error("Process exited with " + code));
       }
-      resolve(logString);
     });
   })
 }
@@ -626,28 +635,34 @@ function gitLogRevHead() {
 
 }
 
-app.get('/api/play', (req, res) => {
+let playerProcessLaunched = false;
+
+app.put('/api/play/:id', (req, res, next) => {
   //fs.readFile("")
-  if (mpvChild) {
-    try {
-      mpvChild.kill()
-    } catch (e) {
-
-    }
+  if(playerProcessLaunched) {
+    res.sendStatus(423);
+    return;
   }
-  mpvChild = spawn('/usr/bin/mplayer', [-/*"--image-display-duration=12",*/ `${UPLOAD_DIR}/*.jpg`]);
-
-  mpvChild.stdout.on('data', (data) => {
-    console.log(`stdout: ${data}`);
-  });
-
-  mpvChild.stderr.on('data', (data) => {
-    console.log(`stderr: ${data}`);
-  });
-
-  mpvChild.on('close', (code) => {
-    console.log(`child process exited with code ${code}`);
-  });
+  const id = req.params.id;
+  const sessionID = req.signedCookies['connect.sid'];
+  MediaElement.findById(id).exec().then( (mediaElement) => {
+    res.sendStatus(204);
+    playerProcessLaunched = true;
+    return executeProcess('/usr/bin/mplayer', ['-fs', `file://${UPLOAD_DIR}/${mediaElement.fileName}`] ).finally(() => {
+      playerProcessLaunched = false;
+      if(sessionID) {
+        const ws = wsm.wsBySessionID(sessionID);
+        if(ws) {
+          sendDataToWS(ws, {
+            command: 'externalPlayFinish',
+            data: { mediaElementID: id }});
+        } else {
+          logError(`No WebSocket found for Session ${sessionID}`);
+        }
+      }
+    });
+  }).catch(next);
+  //mpvChild = spawn('/usr/bin/mplayer', [-/*"--image-display-duration=12",*/ `${UPLOAD_DIR}/*.jpg`]);
 
 });
 

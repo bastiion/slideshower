@@ -3,6 +3,18 @@ const baseAddr = 'http://' + location.hostname + (location.port ? ':' + location
 let ws;
 const uploadPath = "/uploads/";
 
+function logError(message, err) {
+  console.error(message, err);
+  const errorObj = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+  try {
+    const data = { commit: currentSha(), message: message, error: errorObj };
+    sendCommand("clientError", data);
+    _postData("/api/error", data);
+  } catch (e) {
+  }
+
+}
+
 function _postData(url, jsObject) {
 
   return fetch(url, {
@@ -12,6 +24,10 @@ function _postData(url, jsObject) {
     method: 'POST',
     body: JSON.stringify(jsObject)
   });
+}
+
+function invokeExternalPlay(id) {
+  return fetch(baseAddr + "/api/play/" + id, {method: 'PUT'});
 }
 
 function updateFile(fileId, fields) {
@@ -94,7 +110,6 @@ emitResult(getPlaylist, "playlist-updated", "playlist")
                   new CustomEvent("session-updated", {detail: {session: msg.data}})
               );
               break;
-
             case "updatePlayerVolume":
               document.dispatchEvent(
                   new CustomEvent("player-volume-updated", {detail: {volume: msg.data}})
@@ -141,13 +156,18 @@ emitResult(getPlaylist, "playlist-updated", "playlist")
                   new CustomEvent("images-updated", {detail: {images: msg.data}})
               );
               break;
+            case "externalPlayFinish":
+              document.dispatchEvent(
+                  new CustomEvent("external-play-finish", {detail: msg.data})
+              );
+              break;
             case "forceReloadPage":
               window.location.reload();
               break;
             default:
           }
-        } catch (e) {
-
+        } catch (err) {
+          logError("some error occured processing websocket message", err)
         }
       });
 
