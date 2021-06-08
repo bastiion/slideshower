@@ -10,12 +10,11 @@ const WebSocket = require("ws");
 const mongoose = require('mongoose');
 const mime = require('mime-types');
 const errorhandler = require('errorhandler');
-const _ = require('lodash');
 
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
 const UPLOAD_DIR = process.cwd() + "/uploads";
 const UPLOAD_RELATIVE_URI = "/uploads";
-const MONGO_DB = "mongodb://localhost/test";
+const MONGO_DB = "mongodb://mongodb:27017/test";
 const DEFAULT_DURATION = 5;
 
 String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function () {
@@ -159,7 +158,7 @@ function sendDataToWS(ws, data) {
   }
   let wsClients = ws;
   let _data = data;
-  if (_.isObject(data)) _data = JSON.stringify(data);
+  if (data) _data = JSON.stringify(data);
   if (!Array.isArray(ws)) wsClients = [ws];
   for (let wsClient of wsClients) {
     try {
