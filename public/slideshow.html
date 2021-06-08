@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/kioskboard/dist/kioskboard-1.4.0.min.css" />
+  <link rel="stylesheet" href="/materialize-css/dist/css/materialize.min.css">
   <title>Slideshow</title>
   <style>
     body {
@@ -40,6 +42,23 @@
       max-width: 100%;
       height: 100vh;
     }
+
+    .dialog {
+      position: absolute;
+      top: calc(50% - 100px);
+      left: calc(50% - 200px);
+      height: 200px;
+      width: 400px;
+      background-color: rgba(50,50,50, 0.8);
+      padding: 16px;
+
+    }
+     .pinentry {
+       display: flex;
+       flex-direction: column;
+       justify-content: center;
+       align-items: center;
+     }
   </style>
 </head>
 <body>
@@ -47,12 +66,23 @@
   <img class="media-element image" id="imgSlide" src="" alt="">
   <video class="media-element video" autoplay muted id="videoSlide" src="" alt=""></video>
 </div>
+<div class="pinentry dialog">
+  <input class="virtual-keyboard pin" data-kioskboard-type="numpad" placeholder="Bitte eine Pin eingeben" />
+  <div class="row">
+    <a class="cancel-btn waves-effect waves-light btn red">abbrechen</a>
+    <a class="okay-btn waves-effect waves-light btn">okay</a>
+  </div>
+
+</div>
 <script src="/public/sha.js"></script>
 <script src="/jquery/dist/jquery.min.js"></script>
 <script src="/robust-websocket/robust-websocket.js"></script>
 <script src="/vanilla-fade/dist/vanilla-fade.js"></script>
 <script src="/imagesloaded/imagesloaded.pkgd.min.js"></script>
+<script src="/kioskboard/dist/kioskboard-1.4.0.min.js"></script>
+<script src="/materialize-css/dist/js/materialize.min.js"></script>
 <script src="/public/client.js"></script>
+<script src="/public/initKioskboard.js"></script>
 <script>
   let playlist = [];
   let imageIndex = -1;
@@ -67,6 +97,37 @@
   let emergencyTimer = null;
   resetEmergencyReloadTimer();
 
+  $('.pinentry.dialog').hide();
+  $('.pinentry .cancel-btn').on('click', () => {
+    $('.pinentry.dialog').hide();
+  })
+  $('.pinentry .okay-btn').on('click', () => {
+    const pin = $('.pinentry .pin').val();
+    if(pin === '2142') {
+      window.location.replace("http://localhost:3000/");
+    }
+  })
+
+  let clickedDocument = 0
+  let clickResetTimer = null
+
+  $('.slideshow').on('click', () => {
+    clickedDocument++
+    if(!clickResetTimer) {
+      clickResetTimer = setTimeout(function () {
+        clickedDocument = 0;
+        clickResetTimer = null;
+      }, 2000);
+    }
+    if(clickedDocument === 5) {
+      $('.pinentry.dialog').show();
+      clickedDocument = 0;
+      if(clickResetTimer) {
+        clearTimeout(clickResetTimer);
+        clickResetTimer = null;
+      }
+    }
+  })
 
   $(document).on("playlist-updated", (event) => {
     const playl = event.detail.playlist;
