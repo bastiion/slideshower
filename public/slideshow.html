@@ -99,11 +99,13 @@
 
   $('.pinentry.dialog').hide();
   $('.pinentry .cancel-btn').on('click', () => {
+    $('.pinentry .pin').val('');
     $('.pinentry.dialog').hide();
   })
   $('.pinentry .okay-btn').on('click', () => {
     const pin = $('.pinentry .pin').val();
     if(pin === '2142') {
+      $('.pinentry .pin').val('');
       window.location.replace("http://localhost:3000/");
     }
   })
