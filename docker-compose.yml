@@ -1,0 +1,25 @@
+version: '3'
+services:
+  server:
+    image: node:14.10
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - uploads:/app/uploads
+      - node_modules:/app/node_modules
+    working_dir: /app
+    depends_on:
+      - mongodb
+    command: sh -c "yarn && node index.js"
+  mongodb:
+    image: mongo:3.6
+    ports:
+      - 5000:27017
+    volumes:
+      - slideshow_mongo:/data/db
+
+volumes:
+  slideshow_mongo:
+  node_modules:
+  uploads:
