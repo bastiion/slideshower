@@ -14,8 +14,8 @@ const errorhandler = require('errorhandler');
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
 const UPLOAD_DIR = process.cwd() + "/uploads";
 const UPLOAD_RELATIVE_URI = "/uploads";
-const MONGO_DB = "mongodb://mongodb:27017/test";
-//const MONGO_DB = "mongodb://localhost:5000/test";
+//const MONGO_DB = "mongodb://mongodb:27017/test";
+const MONGO_DB = "mongodb://localhost:5000/test";
 const DEFAULT_DURATION = 5;
 
 String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function () {
