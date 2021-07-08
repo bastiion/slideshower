@@ -1,8 +1,9 @@
 {
-  "name": "uploader",
+  "name": "slideshower",
   "version": "1.1.6",
   "description": "",
   "main": "index.js",
+  "bin": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -29,7 +30,6 @@
     "sortablejs": "^1.10.0-rc3",
     "vanilla-fade": "^1.0.1",
     "ws": "^7.1.2",
-    "fomantic-ui": "^2.8.7",
     "kioskboard": "^1.4.0",
     "materialize-css": "^1.0.0"
   }
