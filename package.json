@@ -11,6 +11,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babel/cli": "^7.14.5",
+    "@babel/core": "^7.14.6",
+    "@babel/node": "^7.14.7",
+    "@babel/preset-env": "^7.14.7",
     "bluebird": "^3.5.5",
     "body-parser": "^1.19.0",
     "connect-mongo": "^3.2.0",
@@ -18,19 +22,21 @@
     "errorhandler": "^1.5.1",
     "express": "^4.17.1",
     "express-session": "^1.16.2",
+    "file-type": "^16.5.1",
+    "fomantic-ui": "^2.8.8",
     "imagesloaded": "^4.1.4",
     "jquery": "^3.4.1",
     "jquery-form": "^4.2.2",
     "jquery-sortablejs": "^1.0.1",
+    "kioskboard": "^1.4.0",
     "lodash": "^4.17.21",
+    "materialize-css": "^1.0.0",
     "mime-types": "^2.1.24",
     "mongoose": "^5.12.12",
     "multer": "^1.4.2",
     "robust-websocket": "^1.0.0",
     "sortablejs": "^1.10.0-rc3",
     "vanilla-fade": "^1.0.1",
-    "ws": "^7.1.2",
-    "kioskboard": "^1.4.0",
-    "materialize-css": "^1.0.0"
+    "ws": "^7.1.2"
   }
 }

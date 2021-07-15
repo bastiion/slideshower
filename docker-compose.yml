@@ -12,7 +12,7 @@ services:
     working_dir: /app
     depends_on:
       - mongodb
-    command: sh -c "yarn install --non-interactive; node index.js"
+    command: sh -c "yarn install --non-interactive; nodemon --exec babel-node index.js"
   mongodb:
     restart: always
     image: mongo:3.6

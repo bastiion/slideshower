@@ -40,6 +40,10 @@ function restartBrowser() {
   return fetch(baseAddr + "/api/browser/restart")
 }
 
+function lsFiles(path) {
+  return fetch( baseAddr + '/api/storage/' + path)
+}
+
 function updateFile(fileId, fields) {
   return _postData(baseAddr + "/api/playlist/" + fileId, fields)
 }
@@ -67,6 +71,10 @@ function getPlaylist() {
 
 function getSessions() {
   return fetch(baseAddr + "/api/session");
+}
+
+function listStorage(path) {
+  return fetch(baseAddr + "/api/storage/" + path)
 }
 
 function emitResult(cb, eventName, fieldName) {

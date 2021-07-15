@@ -1,91 +1,96 @@
 <html>
 <head>
-  <title>File upload Node.</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/fomantic-ui/dist/components/reset.css">
-  <link rel="stylesheet" href="/fomantic-ui/dist/semantic.css">
-  <style>
-    .grabbable {
-      cursor: move; /* fallback if grab cursor is unsupported */
-      cursor: grab;
-      cursor: -moz-grab;
-      cursor: -webkit-grab;
-    }
-  </style>
+    <title>File upload Node.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/fomantic-ui/dist/components/reset.css">
+    <link rel="stylesheet" href="/fomantic-ui/dist/semantic.css">
+    <style>
+        .grabbable {
+            cursor: move; /* fallback if grab cursor is unsupported */
+            cursor: grab;
+            cursor: -moz-grab;
+            cursor: -webkit-grab;
+        }
+    </style>
 </head>
 <body>
 <div class="ui text container upload-form">
-  <a href="/public/slideshow.html">Zurück zur Slideshow</a>
-  <h1 class="ui dividing header">1. Ein Bild oder Video hochladen</h1>
-  <form class="ui form" id="uploadForm"
-        enctype="multipart/form-data"
-        action="/api/photo"
-        method="post">
-    <div class="field">
-      <label>Bild oder Video</label>
-      <input type="file" name="userFile" multiple/>
-    </div>
-    <div class="field">
-      <label>Dauer der Darstellung in Sekunden</label>
-      <input type='number' id='duration' name='duration'><br>
-    </div>
-    <div class="field">
-      <div class="ui checkbox accept-conditions">
-        <input type="checkbox" tabindex="0" class="hidden">
-        <label>Ich akzeptiere die <a href="conditions.html">Bedingungen</a></label>
-      </div>
-    </div>
-    <button class="ui button disabled" type="submit">Medien zum Kunstwerk übermitteln</button>
-    <span id="status"></span>
-  </form>
+    <a href="/public/slideshow.html">Zurück zur Slideshow</a>
+    <h1 class="ui dividing header">1. Ein Bild oder Video hochladen</h1>
+    <form class="ui form" id="uploadForm"
+          enctype="multipart/form-data"
+          action="/api/photo"
+          method="post">
+        <div class="field">
+            <label>Bild oder Video</label>
+            <input type="file" name="userFile" multiple/>
+        </div>
+        <div class="filebrowser">
+            <div class="ui list"></div>
+        </div>
+        <div class="selected files">
+            <div class="count"></div>
+            <div class="images"></div>
+        </div>
+        <div class="field">
+            <label>Dauer der Darstellung in Sekunden</label>
+            <input type='number' id='duration' name='duration'><br>
+        </div>
+        <div class="field">
+            <div class="ui checkbox accept-conditions">
+                <input type="checkbox" tabindex="0" class="hidden">
+                <label>Ich akzeptiere die <a href="conditions.html">Bedingungen</a></label>
+            </div>
+        </div>
+        <button class="ui button disabled" type="submit">Medien zum Kunstwerk übermitteln</button>
+        <span id="status"></span>
+    </form>
 </div>
-
-
 
 
 <div class="ui text container sortable-content">
-  <h1 class="ui dividing header">Playlist erstellen</h1>
-  <div id="wrap" class="ui list relaxed items">
-  </div>
+    <h1 class="ui dividing header">Playlist erstellen</h1>
+    <div id="wrap" class="ui list relaxed items">
+    </div>
 </div>
 
 <div class="ui basic modal" id="confirmRemoveModal">
-  <div class="ui icon header">
-    <i class="archive icon"></i>
-    <span class="modal-title">Medien Element aus Playlist?</span>
-  </div>
-  <div class="content">
-    <p>Dies wird aus der Playlists entfernt.</p>
-  </div>
-  <div class="actions">
-    <div class="ui red basic cancel inverted button">
-      <i class="remove icon"></i>
-      Nein
+    <div class="ui icon header">
+        <i class="archive icon"></i>
+        <span class="modal-title">Medien Element aus Playlist?</span>
     </div>
-    <div class="ui green ok inverted button confirm-media-element-remove-btn">
-      <i class="checkmark icon"></i>
-      Ja
+    <div class="content">
+        <p>Dies wird aus der Playlists entfernt.</p>
     </div>
-  </div>
+    <div class="actions">
+        <div class="ui red basic cancel inverted button">
+            <i class="remove icon"></i>
+            Nein
+        </div>
+        <div class="ui green ok inverted button confirm-media-element-remove-btn">
+            <i class="checkmark icon"></i>
+            Ja
+        </div>
+    </div>
 </div>
 <div class="ui basic modal" id="confirmDeleteModal">
-  <div class="ui icon header">
-    <i class="trash icon"></i>
-    <span class="modal-title">Medien Element entfernen?</span>
-  </div>
-  <div class="content">
-    <p>Dies wird die Datei vom Server unwiderrufbar löschen und aus allen Playlists entfernen.</p>
-  </div>
-  <div class="actions">
-    <div class="ui red basic cancel inverted button">
-      <i class="remove icon"></i>
-      Nein
+    <div class="ui icon header">
+        <i class="trash icon"></i>
+        <span class="modal-title">Medien Element entfernen?</span>
     </div>
-    <div class="ui green ok inverted button confirm-media-element-delete-btn">
-      <i class="checkmark icon"></i>
-      Ja
+    <div class="content">
+        <p>Dies wird die Datei vom Server unwiderrufbar löschen und aus allen Playlists entfernen.</p>
     </div>
-  </div>
+    <div class="actions">
+        <div class="ui red basic cancel inverted button">
+            <i class="remove icon"></i>
+            Nein
+        </div>
+        <div class="ui green ok inverted button confirm-media-element-delete-btn">
+            <i class="checkmark icon"></i>
+            Ja
+        </div>
+    </div>
 </div>
 <script src="/public/sha.js"></script>
 <script src="jquery/dist/jquery.min.js"></script>
@@ -100,14 +105,15 @@
 
   $(document).ready(function () {
     let currentMediaElementItemJQ;
+    let selectedPaths = []
     $('.ui.checkbox.accept-conditions').checkbox({
-          onChecked: function () {
-            $('button[type="submit"]').removeClass("disabled");
-          },
-          onUnchecked: function () {
-            $('button[type="submit"]').addClass("disabled");
-          }
+        onChecked: function () {
+          $('button[type="submit"]').removeClass("disabled");
+        },
+        onUnchecked: function () {
+          $('button[type="submit"]').addClass("disabled");
         }
+      }
     );
 
     function showDeleteMediaElementConfirmModal(event) {
@@ -122,6 +128,7 @@
         currentMediaElementItemJQ.remove();
       });
     });
+
     function showRemoveMediaElementConfirmModal(event) {
       const dialog = $("#confirmRemoveModal");
       currentMediaElementItemJQ = $(event.target).closest('.media-element-item');
@@ -131,12 +138,13 @@
 
     $(".confirm-media-element-remove-btn").on('click', (event) => {
       const mediaElementID = currentMediaElementItemJQ.attr('data-media-element-id');
-      if(typeof mediaElementID === 'string' && mediaElementID.length > 0) {
+      if (typeof mediaElementID === 'string' && mediaElementID.length > 0) {
         removeMediaElementFromPlaylist(mediaElementID).then(() => {
           currentMediaElementItemJQ.remove();
         });
       }
     });
+
     $(document).on("playlist-updated", (event) => {
       const playl = event.detail.playlist;
       if (!Array.isArray(playl)) return;
@@ -191,7 +199,7 @@
       }
       $(".clone-media-btn", wrapElement).on('click', (event) => {
         const mediaElementID = $(event.target).closest('.media-element-item').attr('data-media-element-id');
-        if(typeof mediaElementID === 'string' && mediaElementID.length > 0) {
+        if (typeof mediaElementID === 'string' && mediaElementID.length > 0) {
           cloneMediaElement(mediaElementID);
         }
       });
@@ -227,12 +235,13 @@
       $(this).ajaxSubmit({
         error: function (xhr) {
           status.empty().text('Error: ' + xhr.status + ' ' + xhr.message);
-          logError("cannot submit files", { message: xhr.message});
+          logError("cannot submit files", {message: xhr.message});
         },
         success: function (response) {
           console.log(response);
           status.empty().text(response);
-        }
+        },
+        data: { mediaFiles: selectedPaths}
       });
       return false;
     });
@@ -240,7 +249,83 @@
 
     emitResult(getPlaylist, "playlist-updated", "playlist");
 
+
+    function updateSelectedPaths() {
+      const container = $(".selected.files");
+      container.children(".count").text(`${selectedPaths.length} files selected`)
+      container.children(".images").empty().append(selectedPaths.map(path =>
+        $(`<span>
+            <img class="ui small image" src="/media/${path}"  alt="${path}"/>
+           </span>`)))
+    }
+
+    function expandDirectory(path, force) {
+      listStorage(path).then(res => {
+        if (!res.ok) throw new Error("cannot list folders")
+        return res.json()
+      })
+        .then(files => {
+          const selector = path.length === 0 ? ".filebrowser > .list" : `.item[data-path="${path}"] > .content > .list`;
+          $(selector).empty()
+          if (!($(selector).children().length !== 0 && !force)) {
+            $(selector).append(Object.entries(files).map(([filename, file]) => {
+              const fullPath = `${path}/${filename}`
+              if (file.isDirectory) {
+                return $(`
+          <div data-path="${fullPath}" class="item" />`)
+                  .append($(`<i class="folder icon"></i>`)
+                    .click(() => expandDirectory(fullPath)))
+                  .append($(`
+              <div class="content">
+                <div class="header">${filename}</div>
+                <div class="list"></div>
+              </div>`))
+              } else {
+                if (file.mime && /^image\//.test(file.mime)) {
+                  return $(`
+          <div data-path="${fullPath}" class="item">
+                <i class="file icon"></i>
+                <div class="content">
+                  <div class="header">${filename}</div>
+                </div>
+              </div>
+          `).click(() => {
+                    if (selectedPaths.indexOf(fullPath) >= 0) {
+                      selectedPaths = selectedPaths.filter(e => e !== fullPath)
+                    } else {
+                      selectedPaths.push(fullPath)
+                    }
+                    updateSelectedPaths()
+                  })
+                }
+              }
+            }))
+          }
+        })
+    }
+
+    function arrayEquals(arr1, arr2) {
+      return JSON.stringify(arr1.sort()) === JSON.stringify(arr2.sort())
+    }
+
+    let rootFiles = []
+
+    setInterval(() => {
+      listStorage("")
+        .then(res => res.json())
+        .then(files => {
+          const newRootFiles = Object.keys(files)
+          if (!arrayEquals(newRootFiles, rootFiles)) {
+            rootFiles = newRootFiles
+            expandDirectory("", true)
+          }
+        })
+    }, 2000)
+    // setInterval(() => expandDirectory(""), 2000)
+
+
   });
+
 
 </script>
 </body>

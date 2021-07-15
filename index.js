@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const express = require("express");
 const session = require("express-session");
 const MongoStore = require("connect-mongo")(session);
@@ -5,11 +6,13 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const multer = require('multer');
 const fs = require("fs");
+const path = require("path");
 const spawn = require('child_process').spawn;
 const WebSocket = require("ws");
 const mongoose = require('mongoose');
 const mime = require('mime-types');
 const errorhandler = require('errorhandler');
+const FileType = require('file-type');
 
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
 const UPLOAD_DIR = process.cwd() + "/uploads";
@@ -33,12 +36,15 @@ String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd :
 // setup the Server ...
 
 const app = express();
+const router = express.Router();
 const cookieParserInstance = cookieParser(SECRET)
+const mediaFolder = "/media"
 
 // setup the static routes, serving js files and libraries,...
 app.use(express.static("node_modules"));
 app.use(UPLOAD_RELATIVE_URI, express.static(UPLOAD_DIR));
 app.use('/public', express.static("public"));
+app.use('/media', express.static(mediaFolder));
 app.use(bodyParser.json());                     //we need this because we want to parse json from post requests
 app.use(cookieParserInstance);                  //if we want to havea clew about the user session on a websocket
 app.use(errorhandler());                //without this all errors will halt the node.js process
@@ -111,33 +117,33 @@ const SlideshowSessionSchema = new mongoose.Schema({
 const SlideshowSession = mongoose.model('SlieshowSession', SlideshowSessionSchema);
 
 const CommitLogSchema = new mongoose.Schema(
-    {
-      "commit": {type: String},
-      "abbreviated_commit": {type: String},
-      "tree": {type: String},
-      "abbreviated_tree": {type: String},
-      "parent": {type: String},
-      "abbreviated_parent": {type: String},
-      "refs": {type: String},
-      "encoding": {type: String, required: false},
-      "subject": {type: String},
-      "sanitized_subject_line": {type: String},
-      "body": {type: String, required: false},
-      "commit_notes": {type: String, required: false},
-      "verification_flag": {type: String},
-      "signer": {type: String, required: false},
-      "signer_key": {type: String, required: false},
-      "author": {
-        "name": {type: String},
-        "email": {type: String},
-        "date": {type: String}
-      },
-      "commiter": {
-        "name": {type: String},
-        "email": {type: String},
-        "date": {type: String}
-      }
+  {
+    "commit": {type: String},
+    "abbreviated_commit": {type: String},
+    "tree": {type: String},
+    "abbreviated_tree": {type: String},
+    "parent": {type: String},
+    "abbreviated_parent": {type: String},
+    "refs": {type: String},
+    "encoding": {type: String, required: false},
+    "subject": {type: String},
+    "sanitized_subject_line": {type: String},
+    "body": {type: String, required: false},
+    "commit_notes": {type: String, required: false},
+    "verification_flag": {type: String},
+    "signer": {type: String, required: false},
+    "signer_key": {type: String, required: false},
+    "author": {
+      "name": {type: String},
+      "email": {type: String},
+      "date": {type: String}
+    },
+    "commiter": {
+      "name": {type: String},
+      "email": {type: String},
+      "date": {type: String}
     }
+  }
 );
 
 const CommitLog = mongoose.model("CommitLog", CommitLogSchema);
@@ -398,6 +404,16 @@ wss.on('connection', (ws, req) => {
 
 });
 
+function changeUploadFilename(f) {
+  const dotIndex = f.lastIndexOf(".");
+  let ext = "", name = f;
+  if (dotIndex > 0) {
+    ext = f.substring(dotIndex, f.left);
+    name = f.substring(0, f.length - ext.length);
+  }
+  return name + '-' + Date.now() + ext;
+}
+
 // prepare everything for the upload
 // we ease our live using the multer library, that does everything complicated for us
 const storage = multer.diskStorage({
@@ -406,15 +422,9 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, callback) => {
     const f = file.originalname;
-    const dotIndex = f.lastIndexOf(".");
-    let ext = "", name = f;
-    if (dotIndex > 0) {
-      ext = f.substring(dotIndex, f.left);
-      name = f.substring(0, f.length - ext.length);
-    }
-    const newFileName = name + '-' + Date.now() + ext;
     //add the MediaElement to the database
     //permanently store as ${newFileName}
+    const newFileName = changeUploadFilename(f)
     callback(null, newFileName);
   }
 });
@@ -434,146 +444,158 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/error', (req, res, next) =>
-    createClientError({
-      ...req.body,
-      sessionID: req.signedCookies['connect.sid']
-    })
-        .then(() => res.sendStatus(204))
-        .catch(next)
+  createClientError({
+    ...req.body,
+    sessionID: req.signedCookies['connect.sid']
+  })
+    .then(() => res.sendStatus(204))
+    .catch(next)
 );
 app.get('/api/error', (req, res, next) =>
-    ClientError.find({}).sort({'date': 'asc'}).exec()
-        .then(clientErrors => res.json(clientErrors))
-        .catch(next)
+  ClientError.find({}).sort({'date': 'asc'}).exec()
+    .then(clientErrors => res.json(clientErrors))
+    .catch(next)
 );
 
 //the upload form post request
 app.post('/api/photo', upload, (req, res, next) => new Promise(resolve => {
-      console.log(req.files);
-      res.end("File has been uploaded");
-      if (!Array.isArray(req.files)) return;
-      let duration = parseInt(req.body.duration);
-      if (!duration) {
-        duration = DEFAULT_DURATION
-      }
-      const newMediaElements = req.files.map(file => {
+    console.log(req.files);
+    console.log(req.body.mediaFiles)
+    res.end("File has been uploaded");
+    if (!Array.isArray(req.files)) return;
+    let duration = parseInt(req.body.duration);
+    if (!duration) {
+      duration = DEFAULT_DURATION
+    }
+    const newMediaElements = [
+      ...req.files.map(file => {
         const mimeType = mime.lookup(file.path);
         return {fileName: file.filename, mimeType: mimeType, duration: duration}
-      });
-      MediaElement.create(newMediaElements, (err, newElements) => {
-        if (err) {
-          throw new Error("cannot create new MediaElement in DB", err);
-        }
-        sendPlaylist(wsm.wsAll());
-        sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
-        resolve();
-      });
-    }).catch(next)
+      }),
+      ...req.body.mediaFiles.map(fullpath => {
+        const f = path.basename(fullpath)
+        const newFilename = changeUploadFilename(f)
+        const destPath = UPLOAD_DIR + "/" + newFilename;
+        fs.copyFileSync(mediaFolder + fullpath, destPath)
+//        FileType.fromFile(UPLOAD_DIR + "/" + newFilename)
+        const mimeType = mime.lookup(destPath)
+        return {fileName: newFilename, mimeType: mimeType, duration: duration}
+      })]
+  console.log({newMediaElements})
+    MediaElement.create(newMediaElements, (err, newElements) => {
+      if (err) {
+        throw new Error("cannot create new MediaElement in DB", err);
+      }
+      sendPlaylist(wsm.wsAll());
+      sendDataToWS(wsm.wsAll(), {command: "newElements", data: newElements});
+      resolve();
+    });
+  }).catch(next)
 );
 
 app.delete('/api/playlist', (req, res, next) => new Promise(resolve => {
-      MediaElement.deleteMany({}, (err) => {
-        if (err) throw new Error("Cannot delete playlist", err);
-        sendPlaylist(wsm.wsAll());
-        res.sendStatus(204);
-        resolve();
-      });
-    }).catch(next)
+    MediaElement.deleteMany({}, (err) => {
+      if (err) throw new Error("Cannot delete playlist", err);
+      sendPlaylist(wsm.wsAll());
+      res.sendStatus(204);
+      resolve();
+    });
+  }).catch(next)
 );
 
 app.delete('/api/playlist/:id', (req, res, next) => new Promise(resolve => {
-      MediaElement.findByIdAndDelete(req.params.id, (err) => {
-        if (err) throw new Error("Cannot delete file out of playlist", err);
-        sendPlaylist(wsm.wsAll());
-        res.sendStatus(204);
-        resolve();
-      });
-    }).catch(next)
+    MediaElement.findByIdAndDelete(req.params.id, (err) => {
+      if (err) throw new Error("Cannot delete file out of playlist", err);
+      sendPlaylist(wsm.wsAll());
+      res.sendStatus(204);
+      resolve();
+    });
+  }).catch(next)
 );
 
 app.post('/api/playlist/:id', (req, res, next) => new Promise(resolve => {
-      const duration = parseInt(req.body.duration);
-      if (isNaN(duration)) {
-        throw new Error("duration is not a number");
-      }
+    const duration = parseInt(req.body.duration);
+    if (isNaN(duration)) {
+      throw new Error("duration is not a number");
+    }
 
-      return MediaElement.findById(req.params.id).exec().then((mediaFile) => {
-        mediaFile.duration = duration;
-        mediaFile.save();
-        res.sendStatus(204);
-        resolve();
-      }).catch(next);
-    }).catch(next)
+    return MediaElement.findById(req.params.id).exec().then((mediaFile) => {
+      mediaFile.duration = duration;
+      mediaFile.save();
+      res.sendStatus(204);
+      resolve();
+    }).catch(next);
+  }).catch(next)
 );
 
 app.put('/api/clone/playlist/:id', (req, res, next) => {
-      const mediaElementID = req.params.id;
-      MediaElement.findById(mediaElementID).exec().then((newMediaElement) => {
-        newMediaElement._id = mongoose.Types.ObjectId();
-        newMediaElement.isNew = true;
-        return newMediaElement.save()
-      }).then(() => {
-        sendPlaylist(wsm.wsAll());
-        res.sendStatus(204);
-      }).catch(next)
-    }
+    const mediaElementID = req.params.id;
+    MediaElement.findById(mediaElementID).exec().then((newMediaElement) => {
+      newMediaElement._id = mongoose.Types.ObjectId();
+      newMediaElement.isNew = true;
+      return newMediaElement.save()
+    }).then(() => {
+      sendPlaylist(wsm.wsAll());
+      res.sendStatus(204);
+    }).catch(next)
+  }
 );
 
 
 app.delete('/api/files/:fileName', (req, res, next) => new Promise(resolve => {
-      let fileName = req.params.fileName;
-      MediaElement.deleteOne({fileName: fileName}, (err) => {
-        if (err) throw new Error("Cannot delete file out of playlist", err);
-        fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
-          if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
-          res.sendStatus(204);
-          resolve();
-        });
+    let fileName = req.params.fileName;
+    MediaElement.deleteOne({fileName: fileName}, (err) => {
+      if (err) throw new Error("Cannot delete file out of playlist", err);
+      fs.unlink(`${UPLOAD_DIR}/${fileName}`, (err) => {
+        if (err) throw new Error(`Cannot remove file ${fileName} from disk`, err);
+        res.sendStatus(204);
+        resolve();
       });
-    }).catch(next)
+    });
+  }).catch(next)
 );
 
 app.post('/api/playlist', (req, res, next) =>
-    Promise.all(req.body.playlist.map(item =>
-        MediaElement.findById(item._id).exec().then(
-            (mediaFile) => {
-              const orderIndex = parseInt(item.oderIndex);
-              if (!isNaN(orderIndex)) throw new Error("orderIndex is not a number");
-              mediaFile.orderIndex = item.orderIndex;
-              return mediaFile.save()
-            })
-    ))
-        .then(() => {
-          sendPlaylist(wsm.wsAll());
-          res.sendStatus(204);
-        })
-        .catch(next)
+  Promise.all(req.body.playlist.map(item =>
+    MediaElement.findById(item._id).exec().then(
+      (mediaFile) => {
+        const orderIndex = parseInt(item.oderIndex);
+        if (!isNaN(orderIndex)) throw new Error("orderIndex is not a number");
+        mediaFile.orderIndex = item.orderIndex;
+        return mediaFile.save()
+      })
+  ))
+    .then(() => {
+      sendPlaylist(wsm.wsAll());
+      res.sendStatus(204);
+    })
+    .catch(next)
 );
 
 app.put('/api/playlist/recreate', (req, res, next) => new Promise(resolve => {
-      fs.readdir(UPLOAD_DIR, (err, listing) => {
-        if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
-        for (let fileName of listing) {
-          const filePath = `${UPLOAD_DIR}/${fileName}`;
-          const mimeType = mime.lookup(filePath);
-          const mediaElement = new MediaElement({fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
-          mediaElement.save();
-        }
-        res.sendStatus(204);
-      })
-    }).catch(next)
+    fs.readdir(UPLOAD_DIR, (err, listing) => {
+      if (err) throw new Error(`Cannot recreate playlist, because we cannot read ${UPLOAD_DIR}`, err)
+      for (let fileName of listing) {
+        const filePath = `${UPLOAD_DIR}/${fileName}`;
+        const mimeType = mime.lookup(filePath);
+        const mediaElement = new MediaElement({fileName: fileName, mimeType: mimeType, duration: DEFAULT_DURATION});
+        mediaElement.save();
+      }
+      res.sendStatus(204);
+    })
+  }).catch(next)
 );
 
 app.get('/api/session', (req, res, next) => {
   SlideshowSession.find({slideshow: {$exists: true}}).sort({'sessionID': 'asc'}).exec()
-      .then(sessions => res.json(sessions))
-      .catch(next);
+    .then(sessions => res.json(sessions))
+    .catch(next);
 });
 
 app.get('/api/playlist', (req, res, next) => {
   MediaElement.find().sort({'orderIndex': 'asc'}).exec()
-      .then(playlist => res.json(playlist))
-      .catch(next)
+    .then(playlist => res.json(playlist))
+    .catch(next)
 });
 
 // this was a planed in order to launch a media player. can be omited or used
@@ -591,29 +613,29 @@ app.get('/public/sha.js', (req, res, next) => {
 });
 
 app.get('/git/log/all', (req, res, next) =>
-    CommitLog.find({}).sort({"comitter.data": 'asc'}).then(logEntries => {
-      res.json(logEntries);
-    }).catch(next)
+  CommitLog.find({}).sort({"comitter.data": 'asc'}).then(logEntries => {
+    res.json(logEntries);
+  }).catch(next)
 );
 app.put('/git/log/all', (req, res, next) =>
-    executeProcess('git', ['log', '--pretty=format:{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "verification_flag": "%G?",%n  "signer": "%GS",%n  "signer_key": "%GK",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},'])
-        .then(data => {
-          let logEntries = [];
-          if (data.length > 2) {
-            data = "[ " + data.substr(0, data.length - 1) + " ]".replace(/\n/, '', 'g');
-          }
-          try {
-            logEntries = JSON.parse(data);
-          } catch (e) {
-            throw new Error("Cannot parse log string " + data, e);
-          }
-          return Promise.all(logEntries.map(entry =>
-              CommitLog.findOneAndUpdate({commit: entry.commit}, entry, {upsert: true}).exec()
-          ))
-              .then(() => {
-                res.sendStatus(204);
-              })
-        }).catch(next)
+  executeProcess('git', ['log', '--pretty=format:{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "verification_flag": "%G?",%n  "signer": "%GS",%n  "signer_key": "%GK",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},'])
+    .then(data => {
+      let logEntries = [];
+      if (data.length > 2) {
+        data = "[ " + data.substr(0, data.length - 1) + " ]".replace(/\n/, '', 'g');
+      }
+      try {
+        logEntries = JSON.parse(data);
+      } catch (e) {
+        throw new Error("Cannot parse log string " + data, e);
+      }
+      return Promise.all(logEntries.map(entry =>
+        CommitLog.findOneAndUpdate({commit: entry.commit}, entry, {upsert: true}).exec()
+      ))
+        .then(() => {
+          res.sendStatus(204);
+        })
+    }).catch(next)
 );
 
 function executeProcess(command, params) {
@@ -621,7 +643,7 @@ function executeProcess(command, params) {
 
     let gitProcess;
     try {
-       gitProcess = spawn(command, params);
+      gitProcess = spawn(command, params);
     } catch (e) {
       reject(new Error("Process cannot be started " + e));
       return;
@@ -703,13 +725,59 @@ app.put('/api/play/:id', (req, res, next) => {
     }
 
     return executeProcess('/usr/bin/omxplayer', [`file://${UPLOAD_DIR}/${mediaElement.fileName}`])
-        .then(() => {
-          _finally()
-        })
-        .catch(() => _finally());
+      .then(() => {
+        _finally()
+      })
+      .catch(() => _finally());
   }).catch(next);
   //mpvChild = spawn('/usr/bin/mplayer', [-/*"--image-display-duration=12",*/ `${UPLOAD_DIR}/*.jpg`]);
 
 });
 
+const asyncRouter =
+  route =>
+    (req, res, next = console.error) =>
+      Promise.resolve(route(req, res)).catch(next)
 
+
+const fileInfo = (path, filename) => {
+  const filePath = path + filename;
+  const stat = fs.statSync(filePath)
+  const isDirectory = stat.isDirectory()
+  if (isDirectory) {
+    return {
+      filename,
+      isDirectory,
+      ...stat
+    }
+  } else return FileType.fromFile(filePath)
+    .then(v => {
+      return {
+        filename,
+        isDirectory,
+        ...v,
+        ...stat
+      };
+    })
+}
+router.get('/storage2/(*)?', ((req, res) => {
+  res.send(JSON.stringify(req.params, null, 2))
+}))
+
+router.get('/storage/(*)?', asyncRouter(((req, res) => {
+  const path = req.params[0] ? "/" + req.params[0] : "";
+  const fullPath = mediaFolder + path;
+  if (!fs.existsSync(fullPath)) {
+    throw new Error('dir does not exist')
+  }
+  if (!fs.statSync(fullPath).isDirectory()) {
+    throw new Error('not a directory')
+  }
+  Promise.all(
+    fs.readdirSync(fullPath, {withFileTypes: true}).filter(file => !file.isSymbolicLink()).map(file => fileInfo(fullPath + '/', file.name)))
+    .then(filesWithInfo =>
+      filesWithInfo.reduce((acc, {filename, ...cur}) => (acc[filename] = cur, acc), {}))
+    .then(v => res.json(v))
+})));
+
+app.use('/api', router)
