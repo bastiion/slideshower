@@ -17,8 +17,8 @@ const FileType = require('file-type');
 const SECRET = '0628b93e0a9058f1cdaf59f92de22bac';
 const UPLOAD_DIR = process.cwd() + "/uploads";
 const UPLOAD_RELATIVE_URI = "/uploads";
-//const MONGO_DB = "mongodb://mongodb:27017/test";
-const MONGO_DB = "mongodb://localhost:5000/test";
+const MONGO_DB = "mongodb://localhost:27017/test";
+//const MONGO_DB = "mongodb://localhost:5000/test";
 const DEFAULT_DURATION = 5;
 
 String.prototype.trimEnd = String.prototype.trimEnd ? String.prototype.trimEnd : function () {
@@ -50,7 +50,7 @@ app.use(cookieParserInstance);                  //if we want to havea clew about
 app.use(errorhandler());                //without this all errors will halt the node.js process
 app.set('json spaces', 4);
 
-const server = app.listen(3000, () => {
+const server = app.listen(3000, '0.0.0.0', () => {
   console.log("Working on port 3000");
 });
 
@@ -472,7 +472,7 @@ app.post('/api/photo', upload, (req, res, next) => new Promise(resolve => {
         const mimeType = mime.lookup(file.path);
         return {fileName: file.filename, mimeType: mimeType, duration: duration}
       }),
-      ...req.body.mediaFiles.map(fullpath => {
+      ...(req.body.mediaFiles?.map(fullpath => {
         const f = path.basename(fullpath)
         const newFilename = changeUploadFilename(f)
         const destPath = UPLOAD_DIR + "/" + newFilename;
@@ -480,7 +480,7 @@ app.post('/api/photo', upload, (req, res, next) => new Promise(resolve => {
 //        FileType.fromFile(UPLOAD_DIR + "/" + newFilename)
         const mimeType = mime.lookup(destPath)
         return {fileName: newFilename, mimeType: mimeType, duration: duration}
-      })]
+      }) || [])]
   console.log({newMediaElements})
     MediaElement.create(newMediaElements, (err, newElements) => {
       if (err) {
@@ -604,12 +604,7 @@ let mpvChild;
 
 
 app.get('/public/sha.js', (req, res, next) => {
-  gitLogRevHead().then(sha => {
-    if (sha.length > 1) {
-      sha = sha.trimEnd();
-    }
-    res.end(`function currentSha() { return "${sha}"; }`);
-  }).catch(next);
+  res.end(`function currentSha() { return "deactivated"; }`);
 });
 
 app.get('/git/log/all', (req, res, next) =>
@@ -741,6 +736,7 @@ const asyncRouter =
 
 
 const fileInfo = (path, filename) => {
+  try {
   const filePath = path + filename;
   const stat = fs.statSync(filePath)
   const isDirectory = stat.isDirectory()
@@ -759,6 +755,11 @@ const fileInfo = (path, filename) => {
         ...stat
       };
     })
+  } catch(e) {
+	  console.error(e)
+	  return { filename, isDirectory: false }
+
+  }
 }
 router.get('/storage2/(*)?', ((req, res) => {
   res.send(JSON.stringify(req.params, null, 2))

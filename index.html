@@ -11,26 +11,35 @@
             cursor: -moz-grab;
             cursor: -webkit-grab;
         }
+	 .selected.files .images {
+	  display: flex;
+	  justify-content: space-around;
+	 }
+	 .container2 {
+		 margin: 40px;
+	 }
     </style>
 </head>
 <body>
-<div class="ui text container upload-form">
+<div class="ui text container2 upload-form">
     <a href="/public/slideshow.html">Zurück zur Slideshow</a>
-    <h1 class="ui dividing header">1. Ein Bild oder Video hochladen</h1>
+    <h1 class="ui dividing header">Ein Bild oder Video hochladen</h1>
     <form class="ui form" id="uploadForm"
           enctype="multipart/form-data"
           action="/api/photo"
           method="post">
+	    <h2>Entweder hochladen</h2>
         <div class="field">
             <label>Bild oder Video</label>
             <input type="file" name="userFile" multiple/>
         </div>
-        <div class="filebrowser">
-            <div class="ui list"></div>
-        </div>
+	    <h2>Oder von Speichermedium am Terminal-PC</h2>
         <div class="selected files">
             <div class="count"></div>
             <div class="images"></div>
+        </div>
+        <div class="filebrowser">
+            <div class="ui list"></div>
         </div>
         <div class="field">
             <label>Dauer der Darstellung in Sekunden</label>
@@ -39,7 +48,7 @@
         <div class="field">
             <div class="ui checkbox accept-conditions">
                 <input type="checkbox" tabindex="0" class="hidden">
-                <label>Ich akzeptiere die <a href="conditions.html">Bedingungen</a></label>
+                <label>Ich akzeptiere die <a href="#conditions">Bedingungen</a></label>
             </div>
         </div>
         <button class="ui button disabled" type="submit">Medien zum Kunstwerk übermitteln</button>
@@ -195,7 +204,7 @@
     </div>
   </div>
 `
-        )
+        );
       }
       $(".clone-media-btn", wrapElement).on('click', (event) => {
         const mediaElementID = $(event.target).closest('.media-element-item').attr('data-media-element-id');
@@ -239,7 +248,9 @@
         },
         success: function (response) {
           console.log(response);
-          status.empty().text(response);
+          $('#uploadForm')[0].reset();
+	  selectedPaths = [];
+          updateSelectedPaths();
         },
         data: { mediaFiles: selectedPaths}
       });
