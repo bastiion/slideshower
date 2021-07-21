@@ -1,5 +1,5 @@
 {
-  description = "an application to build interactive slideshwows for terminal pcs";
+  description = "an application to build interactive slideshows for terminal pcs";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   outputs = { self, nixpkgs, flake-utils }:
     let
